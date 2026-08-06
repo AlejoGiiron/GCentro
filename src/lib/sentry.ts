@@ -97,18 +97,55 @@ const RE_ISO = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d
 const RE_MOVIL_CO = /\b3\d{9}\b/g
 
 /**
+ * Centinela de los marcadores internos de `scrubString`.
+ *
+ * Escrito como escape `\u0000` y NO como byte NUL literal: el literal es
+ * invisible en el editor y se corrompe en silencio al copiar el archivo — que
+ * es exactamente como se rompió esta función al portarla desde G-Vento.
+ * G-Vento usa esta misma forma desde el cierre del Bloque 1 de G-Centro.
+ */
+const CENTINELA = '\u0000'
+/** Marcador completo: NUL + `g` + índice + NUL. Ver por qué la `g` en `guardar`. */
+// eslint-disable-next-line no-control-regex -- NUL deliberado: es el centinela
+const RE_MARCADOR = /\u0000g(\d+)\u0000/g
+/** Todo NUL que venga en la ENTRADA se barre antes de crear marcadores. */
+// eslint-disable-next-line no-control-regex -- NUL deliberado: es el centinela
+const RE_NUL = /\u0000/g
+
+/**
  * Redacta PII dentro de un string conservando lo que sirve para depurar.
  *
  * Los UUID y las fechas ISO se enmascaran ANTES de la pasada numérica y se
  * restauran después: sin eso, `2026-08-05` saldría como `[monto]-08-05`.
+ *
+ * ⚠️ Los marcadores se delimitan con NUL y no con espacios. Con espacios
+ * (` 0 `) el marcador choca con el texto real y corrompe el mensaje:
+ *   · "reintento 0 de 3" + un UUID guardado → el `0` literal se restauraba
+ *     como el UUID.
+ *   · "código 7 rechazado" sin nada guardado → `guardados[7]` es `undefined`
+ *     y salía "códigoundefinedrechazado".
+ * El NUL no aparece en mensajes de error reales y, por las dudas, se barre de
+ * la entrada antes de crear ningún marcador.
  */
 function scrubString(input: string): string {
   if (!input) return input
 
   const guardados: string[] = []
-  const guardar = (m: string) => ` ${guardados.push(m) - 1} `
+  // La `g` delante del índice NO es decorativa: protege al marcador de
+  // RE_NUM_LARGO. `\b\d{4,}\b` exige un límite de palabra antes del primer
+  // dígito y entre `g` y `1` no lo hay. Sin ella, del marcador 1000 en
+  // adelante el índice salía redactado como `[monto]`, la restauración no
+  // encontraba el marcador y el valor guardado se perdía.
+  const guardar = (m: string) => {
+    guardados.push(m)
+    return `${CENTINELA}g${guardados.length - 1}${CENTINELA}`
+  }
 
-  let s = input.replace(RE_MOVIL_CO, REDACTADO)
+  // Se barre cualquier NUL de la ENTRADA antes de crear marcadores: es lo que
+  // hace que un centinela no se pueda falsificar desde el texto de origen.
+  let s = input.replace(RE_NUL, '')
+
+  s = s.replace(RE_MOVIL_CO, REDACTADO)
 
   s = s.replace(RE_UUID, guardar).replace(RE_ISO, guardar)
 
@@ -119,7 +156,9 @@ function scrubString(input: string): string {
     .replace(RE_MONTO_FMT, '[monto]')
     .replace(RE_NUM_LARGO, '[monto]')
 
-  return s.replace(/ (\d+) /g, (_m, i: string) => guardados[Number(i)])
+  // FAIL-CLOSED: si un marcador quedara sin su valor (solo posible por un bug
+  // acá adentro), sale REDACTADO — nunca `undefined` ni el texto crudo.
+  return s.replace(RE_MARCADOR, (_m, i: string) => guardados[Number(i)] ?? REDACTADO)
 }
 
 /**
