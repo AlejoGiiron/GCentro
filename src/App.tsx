@@ -27,10 +27,19 @@ function App() {
   )
 
   useEffect(() => {
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      void refresh(session)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // ⚠️ El `setTimeout` NO es cosmético. supabase-js invoca este callback
+      // con el lock de auth TOMADO, y `refresh` llama a
+      // `mfa.getAuthenticatorAssuranceLevel()`, que necesita ese mismo lock:
+      // llamarlo acá adentro deadlockea y la app se queda clavada en
+      // "Cargando…". Diferir al siguiente tick libera el lock primero.
+      // Es la recomendación explícita de la documentación de Supabase para
+      // cualquier llamada a Supabase dentro de onAuthStateChange.
+      setTimeout(() => void refresh(session), 0)
     })
-    return () => subscription.subscription.unsubscribe()
+    return () => subscription.unsubscribe()
   }, [refresh])
 
   return (

@@ -24,6 +24,24 @@ export function TotpEnrollPage() {
     let cancelled = false
 
     async function enroll() {
+      // Cada `enroll` crea un factor NUEVO en estado `unverified`. Sin esta
+      // limpieza se acumulan: uno por cada recarga de esta pantalla, más otro
+      // por el doble montaje de StrictMode en dev. Supabase tiene un tope de
+      // factores por usuario, así que a la larga el enrolamiento empieza a
+      // fallar solo. Se barren los abandonados antes de pedir uno limpio.
+      //
+      // `listFactors().totp` trae SOLO los verificados; los pendientes están
+      // en `.all`, que es de donde hay que filtrarlos.
+      const { data: existentes } = await supabase.auth.mfa.listFactors()
+      if (cancelled) return
+
+      for (const factor of existentes?.all ?? []) {
+        if (factor.factor_type === 'totp' && factor.status === 'unverified') {
+          await supabase.auth.mfa.unenroll({ factorId: factor.id })
+        }
+      }
+      if (cancelled) return
+
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
       if (cancelled) return
 
