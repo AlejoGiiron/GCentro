@@ -1,3 +1,40 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ⚠️  ESTE ARCHIVO ESTÁ DUPLICADO A PROPÓSITO
+ *
+ * Existe una copia casi idéntica en G-Vento:
+ *     gvento/src/lib/sentry.ts
+ *
+ * No es un descuido ni un candidato a extraer a un paquete compartido: los dos
+ * repos son independientes y el monorepo se descartó con razón. La duplicación
+ * se acepta, pero explícita.
+ *
+ * REGLA: todo cambio en este archivo obliga a revisar el otro EN LA MISMA
+ * SESIÓN. No "después", no "en el próximo bloque". Si divergen, divergen en
+ * silencio — y esto es código de privacidad: lo que se rompe acá no se nota
+ * hasta que ya salieron datos de un tercero a un servicio externo.
+ *
+ * Lo que NO es igual entre las dos copias, y está bien que no lo sea:
+ * las áreas de `SentryArea`, las claves de `CLAVE_SENSIBLE` y
+ * `IDENTIFICADOR_NUMERICO`, y el correlativo `#N` (solo G-Vento tiene ventas
+ * numeradas). El REDACTOR —`scrubString` y `scrubValue`— sí debe ser idéntico.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * LOS MARCADORES USAN `\u0000` Y NUNCA ESPACIOS
+ *
+ * `scrubString` guarda UUID y fechas ISO detrás de un marcador para que la
+ * pasada numérica no se los coma, y los restaura al final. Ese marcador va
+ * delimitado por NUL, escrito SIEMPRE como el escape `\u0000`.
+ *
+ * Con espacios (` 0 `) el marcador choca con el texto real del mensaje:
+ * un `0` suelto se restaura como un UUID y un índice sin valor emite
+ * literalmente `undefined`. Ya pasó.
+ *
+ * Y como BYTE literal —no como escape— el archivo contiene NUL, git lo trata
+ * como BINARIO, y los diffs de este módulo dejan de poder revisarse. Peor: el
+ * byte es invisible al copiar el archivo entre repos, que es exactamente la
+ * causa raíz de que esta función se rompiera al portarla. El escape es la
+ * única forma correcta.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 /**
  * Sentry — reporte de errores (v1: SOLO errores), configurado igual que en G-Vento.
  *
@@ -50,9 +87,19 @@ export const sentryEnabled =
  * Cubre los campos PII del dominio (cliente, contacto) y todo el texto
  * libre: `notas`, `motivo`, `nota` los escribe un admin y puede meter ahí
  * cualquier cosa ("Juan de G-10, 3001234567").
+ *
+ * ⚠️ ESTA LISTA NO ES LA DE G-VENTO. Se adaptó al esquema de §3 del diseño:
+ *   · `razon` cubre `razon_social` — la denominación legal del cliente. No la
+ *     atrapa ninguna otra regla: no tiene dígitos ni arroba, así que sin esta
+ *     entrada "G-10 SAS" viajaba entero a Sentry.
+ *   · `nit` va anclado a los bordes (`^` o `_`) para no comerse claves como
+ *     `init` o `unit`. Como STRING lo atraparía la pasada numérica, pero como
+ *     NUMBER pasaría intacto — y no se confía en la forma del valor.
+ *   · `referencia` es el número de la transacción bancaria del pago.
+ * Las claves de G-Vento que acá no existen (`waiter`, `mozo`) se omiten.
  */
 const CLAVE_SENSIBLE =
-  /(nombre|name|phone|telefono|tel|email|correo|address|direccion|customer|cliente|contacto|note|nota|reason|motivo|comment|coment|password|token|apikey|authorization)/i
+  /(nombre|name|razon|phone|telefono|tel|email|correo|address|direccion|customer|cliente|contacto|note|nota|reason|motivo|comment|coment|referencia|password|token|apikey|authorization|(^|_)nit(_|$))/i
 
 /**
  * Ramas del evento que NO se tocan: son diagnóstico puro, sin PII, y
