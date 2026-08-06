@@ -16,8 +16,10 @@
 -- ══════════════════════════════════════════════════════════════════════════
 -- PRUEBA 1 — usuario autenticado SIN fila en admins
 -- Esperado: 0 en las cuatro filas.
--- `terminos` es la prueba que importa: tiene 4 filas cargadas por el seed,
--- así que un 0 acá es RLS bloqueando de verdad y no una tabla vacía.
+-- `terminos` (4 filas de seed) y `productos` (3 filas de seed) son las que
+-- importan: un 0 ahí es RLS bloqueando de verdad, no una tabla vacía.
+-- `planes` da 0 en todos los casos porque todavía no tiene filas — no prueba
+-- nada por sí sola.
 -- ══════════════════════════════════════════════════════════════════════════
 begin;
   -- Las claims se setean ANTES de bajar de rol: después de `set role` el rol
@@ -71,8 +73,8 @@ rollback;
 --
 -- Reemplazá el UUID por el de tu usuario admin real (el que insertaste en
 -- `admins` desde el dashboard) y descomentá el bloque.
--- Esperado: 4 en terminos, 0 en productos y planes (todavía sin seed),
--- 1 o más en admins.
+-- Esperado: 1 o más en admins, 3 en productos, 4 en terminos, 0 en planes
+-- (planes sigue sin seed a propósito — falta el dato del contador).
 -- ══════════════════════════════════════════════════════════════════════════
 -- begin;
 --   set local request.jwt.claims = '{"sub":"PEGA-ACA-TU-UUID","role":"authenticated"}';

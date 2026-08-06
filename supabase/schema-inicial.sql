@@ -72,7 +72,15 @@ create table public.planes (
 );
 
 comment on table public.planes is
-  'Estructura del Bloque 1. Sin filas: ver TODO en el seed de este archivo — la decisión de IVA (§9.1 del diseño) bloquea cargar precio_mensual / precio_sede_adicional.';
+  'Estructura del Bloque 1. Sin filas todavía: ver el TODO en el seed de este archivo — falta que el contador confirme los números.';
+
+-- La convención de IVA (§9.1, resuelta) vive también en la base y no solo en
+-- el documento: es el tipo de cosa que se olvida seis meses después, cuando
+-- alguien mira una columna `integer` suelta y tiene que adivinar qué guarda.
+comment on column public.planes.precio_mensual is
+  'BASE GRAVABLE, SIN IVA. COP en pesos enteros. Ver §9.1 del diseño: el IVA se registra al cobrar (pagos.monto / monto_base / iva_pct), no en el catálogo.';
+comment on column public.planes.precio_sede_adicional is
+  'BASE GRAVABLE, SIN IVA. COP en pesos enteros. Misma convención que precio_mensual.';
 
 -- ── Chequeo de pertenencia a la allowlist ────────────────────────────────
 --
@@ -118,6 +126,20 @@ $$;
 revoke execute on function public.es_admin() from public;
 grant  execute on function public.es_admin() to authenticated;
 
+-- ⚠️ `anon` TAMBIÉN necesita EXECUTE, aunque nunca vaya a pasar el chequeo.
+-- Las policies son `for all`, así que se evalúan para CUALQUIER rol que
+-- consulte, incluido el anónimo de antes del login. Sin este grant la
+-- consulta no devuelve cero filas: muere con
+-- `permission denied for function es_admin`, que es un error distinto y
+-- mucho más confuso de diagnosticar.
+--
+-- No abre nada: para `anon`, auth.uid() es null, el `exists` da false y la
+-- policy deniega igual. Lo único que cambia es que deniega limpio.
+grant  execute on function public.es_admin() to anon;
+
+-- `service_role` no necesita grant: tiene BYPASSRLS, así que nunca llega a
+-- evaluar estas policies. Se deja fuera a propósito (mínimo privilegio).
+
 -- ── RLS: deny by default en TODO, sin excepciones ──────────────────────────
 -- Sin fila en admins, ninguna tabla de este proyecto devuelve una sola fila
 -- — ni siquiera admins misma. El primer admin se inserta a mano desde el SQL
@@ -156,10 +178,29 @@ insert into public.terminos (codigo, meses, descuento_pct) values
   ('semestral',  6,  10),
   ('anual',      12, 15);
 
+-- ── Seed: productos ──────────────────────────────────────────────────────
+-- Los tres productos del catálogo (§1: el esquema soporta G-Mura y G-Quota
+-- sin rehacerse). `url_aplicar_estado` va en null en los tres: las Edge
+-- Functions `aplicar-estado` todavía no existen en ningún producto.
+--
+-- `activo`: solo G-Vento arranca en true, que es el único con clientes hoy
+-- (§1: "Hoy solo G-Vento (G-10 y Salchimelo)"). G-Mura y G-Quota quedan en
+-- false para que no se pueda firmar una suscripción contra un producto que
+-- todavía no tiene a dónde escribirle la bandera. Cuando cada uno esté
+-- listo, es un update de una línea.
+insert into public.productos (codigo, nombre, url_aplicar_estado, activo) values
+  ('g-vento', 'G-Vento', null, true),
+  ('g-mura',  'G-Mura',  null, false),
+  ('g-quota', 'G-Quota', null, false);
+
 -- ── Seed: planes ─────────────────────────────────────────────────────────
--- TODO(bloque futuro, bloqueado por §9.1 del diseño — decisión de IVA):
--- cargar acá las filas de planes (producto_id, codigo, nombre, precio_mensual,
--- precio_sede_adicional, incluye_dian, vigente_desde) una vez que se sepa si
--- precio_mensual es neto o incluye IVA. Hasta entonces la tabla queda vacía
--- a propósito — insertar precios ahora obligaría a corregirlos con clientes
--- ya viendo el panel.
+-- TODO(bloque futuro): cargar las filas de planes (producto_id, codigo,
+-- nombre, precio_mensual, precio_sede_adicional, incluye_dian,
+-- vigente_desde).
+--
+-- YA NO ESTÁ BLOQUEADO POR EL MODELO. La decisión de IVA (§9.1) se resolvió:
+-- precio_mensual y precio_sede_adicional son BASE GRAVABLE, SIN IVA. Los
+-- tipos y la semántica de estas columnas son definitivos.
+--
+-- Lo único que falta es el DATO: confirmar con el contador qué número exacto
+-- va en cada plan. En cuanto esté, se cargan sin tocar el esquema.
