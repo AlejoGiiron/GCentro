@@ -3,7 +3,9 @@
 Panel de control de suscripciones. Producto nuevo, repo nuevo, proyecto de Supabase aparte.
 No comparte nada con G-Vento salvo una columna.
 
-Estado del documento: **diseño aprobado, sin migración escrita.**
+Estado del documento: **Bloque 1 aplicado al repo** — catálogo, `admins`, RLS y auth
+escritos en `supabase/schema-inicial.sql`. Decisión de IVA resuelta (§9.1). Falta cargar
+los precios de `planes` (dato del contador) y todo lo de §5 en adelante.
 
 ---
 
@@ -100,6 +102,10 @@ tres productos.
 Precio de **lista**, no de contrato. Cuando subas precios, las suscripciones vigentes
 no deben cambiar solas.
 
+`precio_mensual` y `precio_sede_adicional` son **base gravable, SIN IVA** (ver §9.1).
+Único en `(producto_id, codigo)`: dos planes `esencial` del mismo producto no pueden
+coexistir.
+
 ### terminos
 
 `codigo` pk (`mensual`, `trimestral`, `semestral`, `anual`) · `meses` `smallint` ·
@@ -120,8 +126,8 @@ El contrato.
 | `termino` | `text` fk → terminos | |
 | `estado` | `text` | ver §4 |
 | `sedes_adicionales` | `smallint` | default 0 |
-| `precio_base_mensual` | `integer` | **congelado al firmar** |
-| `precio_sede_adicional` | `integer` | **congelado al firmar** |
+| `precio_base_mensual` | `integer` | **congelado al firmar** · sin IVA (§9.1) |
+| `precio_sede_adicional` | `integer` | **congelado al firmar** · sin IVA (§9.1) |
 | `descuento_pct` | `smallint` | **congelado al firmar** |
 | `fecha_inicio` | `date` | |
 | `periodo_actual_inicio` | `date` | |
@@ -160,10 +166,17 @@ clientes y cuesta bastante.
 ### pagos
 
 `id` · `cliente_id` fk · `suscripcion_id` fk nullable · `concepto` · `monto` `integer` ·
-`fecha_pago` `date` · `metodo` `text` · `referencia` `text` · `cubre_desde` `date` ·
-`cubre_hasta` `date` · `nota` `text` · `registrado_en` `timestamptz`
+`monto_base` `integer` · `iva_pct` `smallint` · `fecha_pago` `date` · `metodo` `text` ·
+`referencia` `text` · `cubre_desde` `date` · `cubre_hasta` `date` · `nota` `text` ·
+`registrado_en` `timestamptz`
 
 Conceptos: `suscripcion` · `implementacion` · `ajuste` · `otro`
+
+**Los tres campos de plata, en la misma fila** (§9.1): `monto` es el **total recibido**
+—lo que efectivamente entró a la cuenta—, `monto_base` es la base gravable y `iva_pct`
+la tasa aplicada. Se guardan los tres y no se derivan dos del tercero: la tasa cambia
+por decreto, y un pago viejo tiene que seguir explicándose con la tasa que tenía ese
+día. Recalcular hacia atrás es exactamente el bug que deja el histórico sin cuadrar.
 
 El par `cubre_desde` / `cubre_hasta` es lo que hace que el histórico sirva:
 `proximo_cobro` se calcula del último `cubre_hasta`, no de un campo que se actualiza a
@@ -182,9 +195,10 @@ Cola de escritura hacia los productos. Ver §5.
 
 ### admins
 
-`id` `uuid` pk (= `auth.users.id`) · `email` · `creado_en`
+`id` `uuid` pk (= `auth.users.id`, `on delete cascade`) · `email` · `creado_en`
 
-Allowlist. Toda política de RLS del proyecto se apoya en esta tabla.
+Allowlist. Toda política de RLS del proyecto se apoya en esta tabla, a través de la
+función `es_admin()` (ver §8).
 
 ---
 
@@ -353,9 +367,43 @@ Tres cosas que importan más que el método:
 
 1. **Registro público desactivado** en el dashboard. Sin esto, cualquiera se crea una
    cuenta y RLS es la única defensa. Con esto, la puerta no existe.
-2. **Deny by default en todas las tablas**, sin excepción, contra
-   `auth.uid() in (select id from admins)`.
+2. **Deny by default en todas las tablas**, sin excepción, contra la allowlist `admins`.
 3. **La service role nunca sale del servidor.** Solo Edge Functions.
+
+### `es_admin()`, no el subquery directo
+
+La forma obvia de escribir la política es `auth.uid() in (select id from admins)`. En
+`productos`, `terminos` y `planes` funciona. **En `admins` no:** una política sobre
+`admins` que consulta `admins` dispara su propia política para resolver el subquery, y
+Postgres corta con `42P17: infinite recursion detected in policy`. El error no aparece
+al crear la política sino en la primera lectura real.
+
+Por eso el chequeo vive en `public.es_admin()`, `security definer` — corre como dueño
+de la tabla, que no pasa por RLS, así que el subquery interno no vuelve a evaluar
+ninguna política.
+
+Tres detalles que no son opcionales:
+
+- **`set search_path = ''`** en la función. Sin eso, alguien que controle el
+  `search_path` de su sesión hace que `admins` resuelva a una tabla suya y la función
+  devuelve `true`.
+- **`revoke execute from public`**, y `grant` explícito a `authenticated` **y a `anon`.**
+  `anon` lo necesita aunque nunca pase el chequeo: las políticas son `for all` y se
+  evalúan para cualquier rol, así que sin el grant la consulta no devuelve cero filas
+  —muere con `permission denied for function es_admin`—. No abre nada: para `anon`,
+  `auth.uid()` es null y el `exists` da `false`.
+- **Nunca `force row level security`.** El dueño de la tabla debe seguir saltándose RLS:
+  es la única puerta para insertar el primer admin desde el SQL Editor.
+
+### Verificación
+
+`supabase/verificar-rls.sql` prueba que la afirmación de arriba es cierta y no solo
+declarada: autenticado sin fila en `admins` y anónimo ven **cero filas** en las cuatro
+tablas, un intento de auto-insertarse en `admins` es rechazado, y un control positivo
+confirma que un admin real sí lee. Todo en transacciones con `rollback`.
+
+Corre `set local role` en cada prueba a propósito: el SQL Editor es `postgres`, dueño
+de las tablas, y no pasa por RLS — un `select` suelto ahí muestra todo y no prueba nada.
 
 Sumar esta base al ciclo de backup nocturno ya montado. Los datos son pocos pero
 irreemplazables: si se pierde el histórico de pagos, no hay forma de reconstruir quién
@@ -363,16 +411,37 @@ debe qué.
 
 ---
 
-## 9. Decisiones pendientes
+## 9. Decisiones
 
-Bloquean la migración.
+### 9.1 IVA — RESUELTA
 
-1. **IVA.** ¿Los $79.000 son con o sin IVA? Define si `monto` es lo que entró a la
-   cuenta o la base gravable.
-2. **Cobro anticipado.** ¿Anual = doce meses cobrados de una con 15% de descuento, o
+**El catálogo guarda base gravable; el pago guarda las tres cifras.**
+
+- `planes.precio_mensual` y `planes.precio_sede_adicional`: **base gravable, SIN IVA.**
+- `suscripciones.precio_base_mensual` y `suscripciones.precio_sede_adicional`
+  (congelados al firmar): **sin IVA**, misma convención que el catálogo.
+- `pagos.monto`: **total recibido**, con IVA incluido — lo que entró a la cuenta.
+- `pagos.monto_base` `integer` y `pagos.iva_pct` `smallint`: base y tasa de ese pago.
+
+El catálogo razona en base gravable porque es el número del que se negocia y sobre el
+que se aplica el descuento por término. El pago razona en total recibido porque es lo
+que hay que cuadrar contra el extracto bancario. Mezclar las dos convenciones en una
+sola columna es lo que obliga a auditar a mano seis meses después.
+
+`iva_pct` se guarda por pago y no se lee de una constante: la tasa cambia por decreto y
+un pago viejo tiene que seguir explicándose con la tasa que tenía ese día.
+
+`descuento_pct` no se ve afectado: es un porcentaje sobre la base, y la base ya está
+definida sin IVA.
+
+### 9.2 Pendientes
+
+Bloquean lo que se construya encima, no la migración del catálogo.
+
+1. **Cobro anticipado.** ¿Anual = doce meses cobrados de una con 15% de descuento, o
    descuento con cobro mensual? Cambia el significado de `cubre_hasta`.
-3. **Implementación exonerada.** ¿Qué pasa si un anual cancela en el mes 3? Si se cobra,
+2. **Implementación exonerada.** ¿Qué pasa si un anual cancela en el mes 3? Si se cobra,
    `estado_implementacion` necesita distinguir exoneración condicional.
-4. **`organizacion_externa_id`.** ¿G-Vento ya tiene tabla de organizaciones con id
+3. **`organizacion_externa_id`.** ¿G-Vento ya tiene tabla de organizaciones con id
    estable, y G-10 y Salchimelo ya son filas ahí? De eso depende si el puente existe o
    hay que construirlo antes.
