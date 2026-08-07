@@ -19,18 +19,23 @@ Si el código termina contradiciendo el documento, **se actualiza el documento e
 el mismo commit** que introduce el cambio. Un documento que quedó atrás del repo
 es peor que no tener documento: se sigue leyendo y ya miente.
 
-### 2. G-Vento es producción — no se toca
+### 2. Este hilo NUNCA toca otro repo
 
-G-Vento tiene **clientes reales facturando hoy** (G-10 y Salchimelo). Su rama
-`main` es producción.
+**Solo se trabaja sobre G-Centro.** No se abre, no se lee y no se modifica
+ningún otro repo — G-Vento incluido, y tampoco para comparar, diagnosticar o
+copiar una implementación.
 
-**No se modifica nada en el repo de G-Vento sin permiso explícito de Alejandro**,
-ni siquiera si encontrás algo roto, ni siquiera si el arreglo es de una línea.
-Se reporta y se espera. Un cambio "obvio" en un POS un viernes a la noche es
-exactamente el que deja a un bar sin poder cobrar.
+**No hay versión con permiso.** No es una regla sobre riesgo de producción que
+un "dale, tocalo" pueda levantar: es una regla sobre el alcance de este hilo.
+Si algo de otro repo hace falta, **se pide y el humano lo consigue**.
 
-Esto incluye migraciones, Edge Functions, dependencias y archivos de config.
-Leer G-Vento para comparar o diagnosticar: siempre bien.
+Si encontrás algo roto allá: **reportás y parás.** El reporte se lo pasa el
+humano al hilo de ese repo, que decide y aplica en su propio contexto.
+
+El motivo no es solo la separación: cuando un repo copia de otro a ciegas, se
+lleva las decisiones que no le corresponden. Derivar cada lista del esquema
+propio es lo que destapa los agujeros — pasó con el filtro de Sentry, donde
+copiar la lista de claves habría dejado `razon_social` y `nit` fugando.
 
 ### 3. Tipos de Supabase: generados, nunca a mano
 
@@ -64,7 +69,24 @@ idéntico" cuando en realidad se había introducido al copiar el archivo — el
 visor mostraba los bytes NUL como espacios. La afirmación sin verificar mandó
 al usuario a pedir un arreglo en producción que no hacía falta.
 
-### 6. Convención Giiron (§2 del documento)
+### 6. El filtro de privacidad es allowlist, y el esquema lo alimenta
+
+**Un filtro de privacidad por deny-list no puede funcionar:** un nombre propio
+es irreconocible por regex, y las columnas nuevas fugan calladas. El filtro es
+**allowlist por clave**; el modo de fallo es **opacidad** (`[Filtrado:tipo]`),
+nunca fuga.
+
+No es una preferencia de implementación, es una propiedad de la categoría de
+filtro. No se vuelve a deny-list "para no perder diagnóstico": la redacción
+tipada conserva la forma, que es lo que hace vivible al allowlist.
+
+**Agregar una tabla o columna al esquema obliga a agregarla a la tabla del test
+de privacidad (`src/lib/sentry.test.ts`), en el mismo commit.** Si no la
+agregás, el allowlist igual la redacta —ese es el punto de haberlo invertido—
+pero perdés la verificación, que es el único lugar donde queda escrito qué se
+consideró al diseñar el filtro.
+
+### 7. Convención Giiron (§2 del documento)
 
 - **Español de Colombia** en UI, dominio y base de datos.
 - **COP en pesos enteros**, sin decimales. `$79.000` se guarda como `79000`
@@ -113,13 +135,14 @@ Correrlo después de cualquier cambio de policies.
 
 ## Duplicación deliberada
 
-`src/lib/sentry.ts` es una copia casi idéntica de `gvento/src/lib/sentry.ts`.
-Está declarado en el encabezado del propio archivo. **Un cambio en el redactor
-obliga a revisar la otra copia en la misma sesión** — sujeto a la regla 2 para
-cualquier modificación efectiva en G-Vento.
+`src/lib/sentry.ts` comparte diseño con el módulo equivalente de G-Vento, pero
+**los dos repos no se tocan entre sí** (regla 2). La sincronización es por
+**traspaso entre hilos**: un cambio de diseño acá produce un reporte que el
+humano le pasa al otro hilo, que decide y aplica en su propio repo.
 
-Los tests de `src/lib/sentry.test.ts` marcados como "BLOQUE ESPEJO" están
-duplicados caso por caso desde G-Vento y deben pasar igual en los dos repos.
+Se transfiere el **diseño** del filtro y el **método** de test.
+No se transfiere la lista de columnas ni el allowlist de claves: cada repo los
+deriva de SU esquema. Está declarado en el encabezado del propio archivo.
 
 ## Estado
 

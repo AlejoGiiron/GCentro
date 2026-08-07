@@ -357,26 +357,50 @@ conoce, Sentry se configura igual, y no hay que cambiar de contexto mental.
 Se puede recortar sin culpa: responsive más allá de que no se rompa, estados de carga
 elegantes, animaciones. Tablas y formularios.
 
-### Deuda aceptada: `sentry.ts` está duplicado
+### El filtro de privacidad de Sentry es allowlist
 
-`src/lib/sentry.ts` es una copia casi idéntica del mismo archivo en G-Vento. Se copia a
-mano y **va a volver a divergir.**
+`src/lib/sentry.ts` no redacta por deny-list. **No es una elección de implementación:
+una deny-list no puede resolver el problema.** Un nombre propio es irreconocible por
+regex —no existe ni puede existir un detector de nombres propios— y cada columna nueva
+del esquema fuga callada hasta que alguien se acuerda de listarla.
 
-El monorepo se descartó con razón (§2) y esa decisión no se revisa por un archivo. Pero
-la duplicación se acepta **explícita, no por olvido**: los dos archivos llevan un
-encabezado que dice que son copias, cuál es la otra, y que **un cambio en uno obliga a
-revisar el otro en la misma sesión.**
+El filtro es **allowlist por clave**. El modo de fallo es **opacidad**, nunca fuga: lo
+que nadie declaró sale como `[Filtrado:number]`. La redacción es **tipada** a propósito
+—se pierde el valor y se conserva la forma— porque eso es lo que la hace vivible: un
+filtro que no deja diagnosticar se termina aflojando por presión de uso.
 
-Qué puede diverger sin problema: las áreas de `SentryArea`, las claves de
-`CLAVE_SENSIBLE` —G-Centro suma `razon_social`, `nit` y `referencia`, que en G-Vento no
-existen— y el correlativo `#N`, que solo G-Vento tiene. Lo que **no** puede diverger es
-el redactor: `scrubString` y `scrubValue`. Los tests marcados "BLOQUE ESPEJO" en
-`src/lib/sentry.test.ts` están duplicados caso por caso desde G-Vento justamente para
-que una divergencia ahí se caiga sola.
+Dos modos, con defaults opuestos y por buena razón:
 
-Por qué importa más que una duplicación cualquiera: es código de privacidad. Lo que se
-rompe ahí no se nota hasta que ya salieron datos de un tercero a un servicio externo.
-Ya pasó una vez, al copiar el archivo por primera vez.
+- **Estricto** (`extra`, `contexts`, `tags`, `user`): allowlist por clave. Acá es casi
+  gratis porque los nombres de clave los elegimos nosotros — no adivinamos qué manda un
+  tercero, declaramos qué mandamos.
+- **Sobre** (mensaje del error, breadcrumbs): prosa, sin claves de las que agarrarse. El
+  allowlist no tiene tracción y se redacta por contenido.
+
+El allowlist es **acotado, nunca global sobre el envelope**: aplicarlo a `level`,
+`sdk`, `release` o `fingerprint` no perdería diagnóstico, haría que Sentry no pueda
+agrupar ni symbolicar el evento. El `stacktrace` pasa entero y es la **única excepción
+de subárbol** del diseño.
+
+**Regla operativa:** agregar una tabla o columna al esquema obliga a agregarla a la
+tabla del test de privacidad en el mismo commit.
+
+### Deuda aceptada: el módulo está duplicado
+
+G-Vento tiene un módulo con el mismo diseño. Se acepta la duplicación —el monorepo se
+descartó con razón (§2) y no se revisa por un archivo— pero **los dos repos no se tocan
+entre sí.**
+
+La sincronización es por **traspaso entre hilos**: un cambio de diseño de un lado
+produce un reporte que el humano le pasa al hilo del otro repo, que decide y aplica en
+su propio contexto. Se transfiere el **diseño** del filtro y el **método** de test;
+**no** la lista de columnas ni el allowlist de claves, que cada repo deriva de SU
+esquema.
+
+Ese último punto no es burocracia. Derivar la lista del esquema propio fue lo que
+destapó que `razon_social`, `nit`, los siete importes y el `jsonb` de
+`suscripcion_eventos` estaban fugando: copiar la lista del otro repo los habría dejado
+pasar, porque esas columnas allá no existen.
 
 ---
 
