@@ -3,9 +3,11 @@
 Panel de control de suscripciones. Producto nuevo, repo nuevo, proyecto de Supabase aparte.
 No comparte nada con G-Vento salvo una columna.
 
-Estado del documento: **Bloque 1 aplicado al repo** — catálogo, `admins`, RLS y auth
-escritos en `supabase/schema-inicial.sql`. Decisión de IVA resuelta (§9.1). Falta cargar
-los precios de `planes` (dato del contador) y todo lo de §5 en adelante.
+Estado del documento: **Bloques 1 y 2 escritos.** Catálogo, `admins`, RLS y auth
+(`schema-inicial.sql`, aplicado). Tablas de negocio, precios de lista, los dos clientes
+reales y el modelo de cobro (migraciones 002 a 005, **pendientes de aplicar**).
+Resueltas: IVA (§9.1), cobro anticipado (§9.2), implementación exonerada (§9.3).
+Falta todo lo de §5 — la bandera y sus Edge Functions — y la UI.
 
 ---
 
@@ -108,10 +110,12 @@ coexistir.
 
 ### terminos
 
-`codigo` pk (`mensual`, `trimestral`, `semestral`, `anual`) · `meses` `smallint` ·
+`codigo` pk (`mensual`, `semestral`, `anual`) · `meses` `smallint` ·
 `descuento_pct` `smallint`
 
-Valores: 0 / 5 / 10 / 15. Tabla y no enum, porque el descuento es dato y va a cambiar.
+Valores vigentes: mensual 0% · semestral 10% · anual 30%. Tabla y no enum, porque el
+descuento es dato y ya cambió una vez: el trimestral se eliminó y el anual pasó de 15%
+a 30% (`002-terminos-corregidos.sql`).
 
 ### suscripciones
 
@@ -133,7 +137,7 @@ El contrato.
 | `periodo_actual_inicio` | `date` | |
 | `periodo_actual_fin` | `date` | |
 | `proximo_cobro` | `date` | derivado del último `cubre_hasta` |
-| `estado_implementacion` | `text` | `pendiente` · `cobrada` · `exonerada` |
+| `estado_implementacion` | `text` | `pendiente` · `cobrada` · `exonerada_condicional` · `exonerada` — ver §9.3 |
 | `organizacion_externa_id` | `uuid` | id de la organización en la base del producto |
 | `creado_en` | `timestamptz` | |
 
@@ -191,7 +195,14 @@ sabés cómo se comporta el modelo.
 Cola de escritura hacia los productos. Ver §5.
 
 `id` · `suscripcion_id` fk · `valor_deseado` `text` · `intentos` `smallint` ·
-`ultimo_error` `text` · `confirmado_en` `timestamptz` nullable · `creado_en`
+`ultimo_error` `text` · `bandera_error_codigo` `text` · `confirmado_en` `timestamptz`
+nullable · `creado_en`
+
+`ultimo_error` es el texto crudo y **no viaja a Sentry**: es texto libre y ya se comprobó
+que ahí termina cayendo un nombre propio. Para diagnóstico externo va
+`bandera_error_codigo`, un enum derivado (`HMAC_INVALIDO` · `TIMEOUT` · `HTTP_4XX` ·
+`HTTP_5XX` · `ORG_NO_ENCONTRADA` · `RED` · `DESCONOCIDO`) que responde la única pregunta
+que importa cuando falla la sincronización: ¿es el secreto, la red, o el otro lado?
 
 ### admins
 
@@ -228,16 +239,52 @@ solo.** Son dos clientes y los conocés por el nombre. La automatización espera
 
 ### Cambio de plan a mitad de período
 
-Es más política que esquema.
+**El período NO se reinicia.** El principio del que sale todo lo demás:
 
-- **Por defecto: efectivo al cierre del período.** Se registra un `CAMBIO_PLAN` con
-  `efectivo_desde = periodo_actual_fin` y la suscripción cambia cuando llega la fecha.
-  Cero prorrateo.
-- **Upgrade urgente** (alguien quiere DIAN ya): se aplica inmediato y la diferencia
-  entra como `pago` con `concepto = 'ajuste'` en el ciclo siguiente.
-- **Downgrade: nunca inmediato.** Siempre al cierre, si no hay que devolver plata.
+> **La plata pagada conserva su valor.**
 
-Prorrateo real necesita ledger de cargos. No va en v1.
+Lo que el cliente ya pagó y todavía no consumió no se pierde, no se recalcula desde
+cero y no se devuelve: se convierte.
+
+**UPGRADE — se paga la diferencia, la fecha no se mueve.**
+
+El cliente ya pagó ese tiempo; lo que compra es más nivel por el mismo tiempo.
+
+> Esencial anual (56.000/mes), mes 5, quedan 7 meses. Sube a Profesional anual
+> (91.000/mes). Se cobra la diferencia por lo que queda; el vencimiento no cambia.
+
+**DOWNGRADE — el saldo se convierte, la fecha se extiende.**
+
+> Profesional anual (91.000/mes), mes 5, quedan 7 meses. Baja a Esencial anual
+> (56.000/mes). El saldo compra más días del plan barato y el vencimiento se corre.
+
+**Nunca se devuelve plata.** Un downgrade compra tiempo, no un reembolso.
+
+#### Reglas de cálculo
+
+- Se usa el precio **congelado** de la suscripción (`precio_base_mensual`), nunca el de
+  lista. G-10 y Salchimelo tienen precio especial, y leer del catálogo les subiría el
+  precio en silencio justo cuando cambian de plan.
+- **El precio del plan nuevo es una decisión, no una consulta.** Un cliente con precio
+  especial que sube de plan no hereda automáticamente el precio de lista del plan
+  destino: quién fija ese número es quien ejecuta el cambio.
+- Con sedes adicionales, el saldo se calcula sobre el **total mensual** (plan + sedes), y
+  el precio nuevo también. El descuento por término se aplica sobre ese total.
+- **El cálculo se hace EN DÍAS, no en meses**, para que la fecha caiga exacta. Una cuenta
+  en meses obliga a decidir qué es "medio mes" y arrastra el error hasta el vencimiento.
+- El período es **cerrado en ambos extremos**: `periodo_actual_fin` es el último día
+  cubierto. Un cambio el último día todavía tiene un día de saldo, no cero.
+- Cada cambio deja un `suscripcion_evento` con el saldo, la fecha vieja y la nueva.
+  Dentro de seis meses, "por qué esta suscripción vence el 12 de marzo" tiene que poder
+  responderse sin rehacer la cuenta.
+
+Implementado como funciones puras en `src/lib/cobro.ts`, con los casos borde cubiertos en
+`src/lib/cobro.test.ts`. **No hay UI todavía**: es modelo y lógica.
+
+Una consecuencia contraintuitiva que conviene tener presente: la extensión de un
+downgrade depende del **ratio** entre el precio viejo y el nuevo, no del saldo absoluto.
+Sumar sedes a ambos lados sube el saldo pero acerca el ratio a 1, así que extiende
+**menos**. Está fijado en un test.
 
 ---
 
@@ -465,28 +512,66 @@ debe qué.
 - `planes.precio_mensual` y `planes.precio_sede_adicional`: **base gravable, SIN IVA.**
 - `suscripciones.precio_base_mensual` y `suscripciones.precio_sede_adicional`
   (congelados al firmar): **sin IVA**, misma convención que el catálogo.
-- `pagos.monto`: **total recibido**, con IVA incluido — lo que entró a la cuenta.
+- `pagos.monto`: **total recibido** — lo que entró a la cuenta.
 - `pagos.monto_base` `integer` y `pagos.iva_pct` `smallint`: base y tasa de ese pago.
+
+**HOY NO HAY IVA. Giiron no es responsable de IVA**, así que en toda fila:
+
+```
+iva_pct    = 0
+monto_base = monto
+```
+
+Las dos columnas **se quedan igual**, y no es indecisión: el día que se cruce el umbral
+de responsabilidad, los pagos viejos tienen que seguir explicándose con la tasa que
+tenían —que es 0— y los nuevos con la suya. Por eso la tasa va por fila y no en una
+constante de la aplicación. Agregar las columnas ese día obligaría a decidir qué poner
+en el histórico, y la respuesta correcta ya está guardada desde ahora.
 
 El catálogo razona en base gravable porque es el número del que se negocia y sobre el
 que se aplica el descuento por término. El pago razona en total recibido porque es lo
-que hay que cuadrar contra el extracto bancario. Mezclar las dos convenciones en una
-sola columna es lo que obliga a auditar a mano seis meses después.
-
-`iva_pct` se guarda por pago y no se lee de una constante: la tasa cambia por decreto y
-un pago viejo tiene que seguir explicándose con la tasa que tenía ese día.
+que hay que cuadrar contra el extracto bancario. Hoy los dos números coinciden; la
+distinción se mantiene porque el día que dejen de coincidir no se puede reconstruir
+hacia atrás.
 
 `descuento_pct` no se ve afectado: es un porcentaje sobre la base, y la base ya está
 definida sin IVA.
 
-### 9.2 Pendientes
+### 9.2 Cobro anticipado — RESUELTA
 
-Bloquean lo que se construya encima, no la migración del catálogo.
+**Anual = doce meses cobrados por adelantado**, con el descuento del término aplicado.
+`cubre_hasta` es entonces el último día del año pagado, y el período de la suscripción
+abarca los doce meses completos.
 
-1. **Cobro anticipado.** ¿Anual = doce meses cobrados de una con 15% de descuento, o
-   descuento con cobro mensual? Cambia el significado de `cubre_hasta`.
-2. **Implementación exonerada.** ¿Qué pasa si un anual cancela en el mes 3? Si se cobra,
-   `estado_implementacion` necesita distinguir exoneración condicional.
-3. **`organizacion_externa_id`.** ¿G-Vento ya tiene tabla de organizaciones con id
+De ahí sale la regla de la implementación (§9.3) y la de cambio de plan (§4): si los
+doce meses ya entraron a la cuenta, lo que queda por consumir es un saldo real, no una
+promesa de pago.
+
+### 9.3 Implementación exonerada — RESUELTA
+
+`estado_implementacion` tiene **cuatro** valores, no tres:
+
+`pendiente` · `cobrada` · `exonerada_condicional` · `exonerada`
+
+La implementación se regala a cambio de permanencia, y hasta que la permanencia se
+cumpla el regalo no está confirmado:
+
+| Situación | Estado |
+|---|---|
+| Firma con plan anual | `exonerada_condicional` |
+| Completa doce meses de servicio anual | `exonerada` — firme, ya no se reclama |
+| Cambia a un término menor antes del año | `pendiente` — se vuelve exigible |
+| **Cancela** | **sin cambio — NO se vuelve exigible** |
+
+**Cancelar no la hace exigible** y esa es la parte que más se discute: los doce meses ya
+se pagaron por adelantado. El cliente cumplió su parte y se va antes de consumirla;
+cobrarle la implementación ahí sería cobrarle dos veces por irse.
+
+Implementado en `transicionImplementacion()` (`src/lib/cobro.ts`), con los estados
+terminales (`cobrada`, `exonerada`) blindados contra cualquier evento.
+
+### 9.4 Pendientes
+
+1. **`organizacion_externa_id`.** ¿El producto ya tiene tabla de organizaciones con id
    estable, y G-10 y Salchimelo ya son filas ahí? De eso depende si el puente existe o
-   hay que construirlo antes.
+   hay que construirlo antes. Hoy las dos suscripciones lo tienen en `NULL`.
