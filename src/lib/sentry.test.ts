@@ -26,7 +26,9 @@ import { scrubEstricto, scrubSobre, scrubEvento } from './sentry'
 // ═══════════════════════════════════════════════════════════════════════════
 // TABLA DE COLUMNAS DEL ESQUEMA REAL
 //
-// Derivada de `supabase/schema-inicial.sql` y de §3 del documento de diseño.
+// Derivada de las migraciones de `supabase/` (schema-inicial + 002 a 005) y de
+// §3 del documento. Las cinco tablas de negocio YA EXISTEN: dejaron de estar
+// pendientes en 003-tablas-negocio.sql.
 // NO de `database.types.ts`, que está escrito a mano y no es fuente confiable
 // (regla 3 del CLAUDE.md).
 //
@@ -44,8 +46,6 @@ interface ColumnaEsquema {
   columna: string
   ejemplo: unknown
   permitida?: true
-  /** La tabla todavía no existe: llega en el Bloque 2. */
-  pendiente?: true
 }
 
 const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
@@ -64,67 +64,68 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // `suscripciones`, donde es el trato específico de un cliente. Una clave que
   // mapea a dos columnas con decisiones opuestas no identifica una columna, y
   // cae fail-closed. El valor de catálogo se recupera calificado.
-  { tabla: 'terminos', columna: 'descuento_pct', ejemplo: 15 },
-  { tabla: 'terminos', columna: 'termino_descuento_pct', ejemplo: 15, permitida: true },
+  { tabla: 'terminos', columna: 'descuento_pct', ejemplo: 30 },
+  { tabla: 'terminos', columna: 'termino_descuento_pct', ejemplo: 30, permitida: true },
 
   // ── planes (schema-inicial.sql) ─────────────────────────────────────────
   { tabla: 'planes', columna: 'codigo', ejemplo: 'esencial', permitida: true },
   { tabla: 'planes', columna: 'nombre', ejemplo: 'Plan Esencial' },
-  { tabla: 'planes', columna: 'precio_mensual', ejemplo: 79000 },
-  { tabla: 'planes', columna: 'precio_sede_adicional', ejemplo: 25000 },
+  { tabla: 'planes', columna: 'precio_mensual', ejemplo: 80000 },
+  { tabla: 'planes', columna: 'precio_sede_adicional', ejemplo: 60000 },
   { tabla: 'planes', columna: 'incluye_dian', ejemplo: true, permitida: true },
   { tabla: 'planes', columna: 'vigente_desde', ejemplo: '2026-01-01' },
 
   // ── admins (schema-inicial.sql) ─────────────────────────────────────────
   { tabla: 'admins', columna: 'email', ejemplo: 'admin@gcentro.co' },
 
-  // ── clientes (§3, Bloque 2) ─────────────────────────────────────────────
-  { tabla: 'clientes', columna: 'nombre_comercial', ejemplo: 'Bar G-10', pendiente: true },
-  { tabla: 'clientes', columna: 'razon_social', ejemplo: 'G-10 SAS', pendiente: true },
-  { tabla: 'clientes', columna: 'nit', ejemplo: 900123456, pendiente: true },
-  { tabla: 'clientes', columna: 'contacto_nombre', ejemplo: 'Juan Perez', pendiente: true },
-  { tabla: 'clientes', columna: 'contacto_email', ejemplo: 'juan@g10.co', pendiente: true },
-  { tabla: 'clientes', columna: 'contacto_telefono', ejemplo: '3001234567', pendiente: true },
-  { tabla: 'clientes', columna: 'notas', ejemplo: 'Debe dos meses, hablar con Ana', pendiente: true },
+  // ── clientes (003-tablas-negocio.sql) ─────────────────────────────────────────────
+  { tabla: 'clientes', columna: 'nombre_comercial', ejemplo: 'Bar G-10' },
+  { tabla: 'clientes', columna: 'razon_social', ejemplo: 'G-10 SAS' },
+  { tabla: 'clientes', columna: 'nit', ejemplo: 900123456 },
+  { tabla: 'clientes', columna: 'contacto_nombre', ejemplo: 'Juan Perez' },
+  { tabla: 'clientes', columna: 'contacto_email', ejemplo: 'juan@g10.co' },
+  { tabla: 'clientes', columna: 'contacto_telefono', ejemplo: '3001234567' },
+  { tabla: 'clientes', columna: 'notas', ejemplo: 'Debe dos meses, hablar con Ana' },
 
-  // ── suscripciones (§3, Bloque 2) ────────────────────────────────────────
-  { tabla: 'suscripciones', columna: 'termino', ejemplo: 'anual', permitida: true, pendiente: true },
-  { tabla: 'suscripciones', columna: 'estado', ejemplo: 'gracia', permitida: true, pendiente: true },
-  { tabla: 'suscripciones', columna: 'sedes_adicionales', ejemplo: 3, permitida: true, pendiente: true },
-  { tabla: 'suscripciones', columna: 'precio_base_mensual', ejemplo: 79000, pendiente: true },
-  { tabla: 'suscripciones', columna: 'precio_sede_adicional', ejemplo: 25000, pendiente: true },
-  { tabla: 'suscripciones', columna: 'descuento_pct', ejemplo: 15, pendiente: true },
-  { tabla: 'suscripciones', columna: 'estado_implementacion', ejemplo: 'exonerada', permitida: true, pendiente: true },
-  { tabla: 'suscripciones', columna: 'fecha_inicio', ejemplo: '2026-01-15', pendiente: true },
-  { tabla: 'suscripciones', columna: 'proximo_cobro', ejemplo: '2026-09-01', pendiente: true },
+  // ── suscripciones (003-tablas-negocio.sql) ────────────────────────────────────────
+  { tabla: 'suscripciones', columna: 'termino', ejemplo: 'anual', permitida: true },
+  { tabla: 'suscripciones', columna: 'estado', ejemplo: 'gracia', permitida: true },
+  { tabla: 'suscripciones', columna: 'sedes_adicionales', ejemplo: 3, permitida: true },
+  { tabla: 'suscripciones', columna: 'precio_base_mensual', ejemplo: 75000 },
+  { tabla: 'suscripciones', columna: 'precio_sede_adicional', ejemplo: 60000 },
+  { tabla: 'suscripciones', columna: 'descuento_pct', ejemplo: 30 },
+  { tabla: 'suscripciones', columna: 'estado_implementacion', ejemplo: 'exonerada', permitida: true },
+  { tabla: 'suscripciones', columna: 'fecha_inicio', ejemplo: '2026-01-15' },
+  { tabla: 'suscripciones', columna: 'proximo_cobro', ejemplo: '2026-09-01' },
 
-  // ── suscripcion_eventos (§3, Bloque 2) ──────────────────────────────────
-  { tabla: 'suscripcion_eventos', columna: 'tipo', ejemplo: 'CAMBIO_PLAN', permitida: true, pendiente: true },
-  { tabla: 'suscripcion_eventos', columna: 'estado_anterior', ejemplo: 'activa', permitida: true, pendiente: true },
-  { tabla: 'suscripcion_eventos', columna: 'estado_nuevo', ejemplo: 'gracia', permitida: true, pendiente: true },
-  { tabla: 'suscripcion_eventos', columna: 'motivo', ejemplo: 'Lo pidio Juan por telefono', pendiente: true },
-  { tabla: 'suscripcion_eventos', columna: 'efectivo_desde', ejemplo: '2026-09-01', pendiente: true },
+  // ── suscripcion_eventos (003-tablas-negocio.sql) ──────────────────────────────────
+  { tabla: 'suscripcion_eventos', columna: 'tipo', ejemplo: 'CAMBIO_PLAN', permitida: true },
+  { tabla: 'suscripcion_eventos', columna: 'estado_anterior', ejemplo: 'activa', permitida: true },
+  { tabla: 'suscripcion_eventos', columna: 'estado_nuevo', ejemplo: 'gracia', permitida: true },
+  { tabla: 'suscripcion_eventos', columna: 'motivo', ejemplo: 'Lo pidio Juan por telefono' },
+  { tabla: 'suscripcion_eventos', columna: 'efectivo_desde', ejemplo: '2026-09-01' },
   // `jsonb` sin esquema fijo: se colapsa entero, no se allowlistean claves internas.
-  { tabla: 'suscripcion_eventos', columna: 'datos', ejemplo: { quien: 'Juan Perez', precio_viejo: 79000 }, pendiente: true },
+  { tabla: 'suscripcion_eventos', columna: 'datos', ejemplo: { quien: 'Juan Perez', precio_viejo: 79000 } },
 
-  // ── pagos (§3, Bloque 2) ────────────────────────────────────────────────
-  { tabla: 'pagos', columna: 'concepto', ejemplo: 'suscripcion', permitida: true, pendiente: true },
-  { tabla: 'pagos', columna: 'monto', ejemplo: 94010, pendiente: true },
-  { tabla: 'pagos', columna: 'monto_base', ejemplo: 79000, pendiente: true },
-  { tabla: 'pagos', columna: 'iva_pct', ejemplo: 19, permitida: true, pendiente: true },
-  { tabla: 'pagos', columna: 'metodo', ejemplo: 'transferencia', permitida: true, pendiente: true },
-  { tabla: 'pagos', columna: 'referencia', ejemplo: 'NEQUI-8842119', pendiente: true },
-  { tabla: 'pagos', columna: 'nota', ejemplo: 'Pago parcial de Carlos', pendiente: true },
-  { tabla: 'pagos', columna: 'fecha_pago', ejemplo: '2026-08-05', pendiente: true },
-  { tabla: 'pagos', columna: 'cubre_hasta', ejemplo: '2026-09-01', pendiente: true },
+  // ── pagos (003-tablas-negocio.sql) ────────────────────────────────────────────────
+  { tabla: 'pagos', columna: 'concepto', ejemplo: 'suscripcion', permitida: true },
+  { tabla: 'pagos', columna: 'monto', ejemplo: 75000 },
+  { tabla: 'pagos', columna: 'monto_base', ejemplo: 75000 },
+  // Siempre 0: Giiron no es responsable de IVA (§9.1).
+  { tabla: 'pagos', columna: 'iva_pct', ejemplo: 0, permitida: true },
+  { tabla: 'pagos', columna: 'metodo', ejemplo: 'transferencia', permitida: true },
+  { tabla: 'pagos', columna: 'referencia', ejemplo: 'NEQUI-8842119' },
+  { tabla: 'pagos', columna: 'nota', ejemplo: 'Pago parcial de Carlos' },
+  { tabla: 'pagos', columna: 'fecha_pago', ejemplo: '2026-08-05' },
+  { tabla: 'pagos', columna: 'cubre_hasta', ejemplo: '2026-09-01' },
 
-  // ── banderas_pendientes (§3, Bloque 2) ──────────────────────────────────
-  { tabla: 'banderas_pendientes', columna: 'valor_deseado', ejemplo: 'restringida', permitida: true, pendiente: true },
-  { tabla: 'banderas_pendientes', columna: 'intentos', ejemplo: 3, permitida: true, pendiente: true },
+  // ── banderas_pendientes (003-tablas-negocio.sql) ──────────────────────────────────
+  { tabla: 'banderas_pendientes', columna: 'valor_deseado', ejemplo: 'restringida', permitida: true },
+  { tabla: 'banderas_pendientes', columna: 'intentos', ejemplo: 3, permitida: true },
   // Texto libre: ya dejó salir un nombre propio en la auditoría. Para triage
   // de sync existe `bandera_error_codigo`, que es un enum derivado.
-  { tabla: 'banderas_pendientes', columna: 'ultimo_error', ejemplo: 'HMAC invalido para org de Juan Perez', pendiente: true },
-  { tabla: 'banderas_pendientes', columna: 'bandera_error_codigo', ejemplo: 'HMAC_INVALIDO', permitida: true, pendiente: true },
+  { tabla: 'banderas_pendientes', columna: 'ultimo_error', ejemplo: 'HMAC invalido para org de Juan Perez' },
+  { tabla: 'banderas_pendientes', columna: 'bandera_error_codigo', ejemplo: 'HMAC_INVALIDO', permitida: true },
 ]
 
 const FILTRADAS = COLUMNAS_DEL_ESQUEMA.filter((c) => !c.permitida)
@@ -138,7 +139,7 @@ const salida = (v: unknown) => JSON.stringify(scrubEstricto(v))
 // ═══════════════════════════════════════════════════════════════════════════
 describe('scrubEstricto — ninguna columna sensible sale verbatim', () => {
   for (const col of FILTRADAS) {
-    const etiqueta = `${col.tabla}.${col.columna}${col.pendiente ? ' (Bloque 2)' : ''}`
+    const etiqueta = `${col.tabla}.${col.columna}`
 
     it(`${etiqueta} — como valor nativo`, () => {
       const out = salida({ [col.columna]: col.ejemplo })
