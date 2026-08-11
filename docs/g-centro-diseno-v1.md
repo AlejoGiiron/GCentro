@@ -108,6 +108,47 @@ no deben cambiar solas.
 Único en `(producto_id, codigo)`: dos planes `esencial` del mismo producto no pueden
 coexistir.
 
+#### Precios de lista vigentes
+
+Base mensual, sin IVA. Cargados en `004-seed-planes.sql`.
+
+| Plan | Mensual | Sede adicional | DIAN |
+|---|---|---|---|
+| Esencial | 80.000 | 60.000 | no |
+| Profesional | 130.000 | 90.000 | sí |
+
+**Los precios con descuento NO se guardan: se derivan del término.** Duplicar un precio
+es cómo se termina con dos números distintos para lo mismo.
+
+| | Mensual (0%) | Semestral (10%) | Anual (30%) |
+|---|---|---|---|
+| Esencial | 80.000 | 72.000 | 56.000 |
+| Profesional | 130.000 | 117.000 | 91.000 |
+| Sede Esencial | 60.000 | 54.000 | 42.000 |
+| Sede Profesional | 90.000 | 81.000 | 63.000 |
+
+**Las bases están elegidas para que los doce derivados den enteros exactos.** Por eso no
+hay regla de redondeo en ningún lado: no hace falta. Está verificado en
+`cobro.test.ts` ("el catálogo NO necesita regla de redondeo"), que recorre las cuatro
+bases por los tres términos. Si un precio de lista futuro rompe esa propiedad, el test
+falla antes de que aparezca un peso de diferencia en una factura.
+
+**Invariante al mover precios: la escalera de valor no se puede invertir.** El plan con
+DIAN en su término más barato tiene que seguir por encima del plan sin DIAN en su
+término más caro — hoy 91.000 contra 80.000. Un descuento anual demasiado agresivo lo
+da vuelta: con 40%, Profesional anual caía a 78.000 y quedaba por debajo de Esencial
+mensual, o sea DIAN incluida más barata que no tenerla. Fue el motivo de bajar el anual
+del 40% al 30%.
+
+#### Cargos de única vez
+
+**Implementación: 250.000.** Se congela en `suscripciones.monto_implementacion` al
+firmar, igual que los otros precios del contrato. Su estado lo lleva
+`estado_implementacion` (§9.3): con plan anual arranca exonerada condicional.
+
+**Las sedes adicionales no pagan implementación.** El cliente las autogestiona con
+onboarding y videos. Si pide soporte de montaje, se cobra aparte y no es parte del plan.
+
 ### terminos
 
 `codigo` pk (`mensual`, `semestral`, `anual`) · `meses` `smallint` ·
@@ -133,6 +174,7 @@ El contrato.
 | `precio_base_mensual` | `integer` | **congelado al firmar** · sin IVA (§9.1) |
 | `precio_sede_adicional` | `integer` | **congelado al firmar** · sin IVA (§9.1) |
 | `descuento_pct` | `smallint` | **congelado al firmar** |
+| `monto_implementacion` | `integer` | **congelado al firmar** · cargo de única vez, ver §3 |
 | `fecha_inicio` | `date` | |
 | `periodo_actual_inicio` | `date` | |
 | `periodo_actual_fin` | `date` | |
@@ -147,6 +189,13 @@ negocios distintos.
 
 `organizacion_externa_id` es el único puente entre los dos sistemas. Nullable hasta que
 la organización exista del otro lado.
+
+**Un precio especial es un acuerdo, no un descuento por término.** G-10 y Salchimelo
+pagan 75.000 donde la lista dice 80.000: eso se carga como `precio_base_mensual = 75.000`
+con `descuento_pct = 0`, y **no** como un 6,25% de descuento sobre 80.000. Si mañana
+renegociás, el número no queda confundido con la escalera de términos — que es la que
+sube automáticamente si el cliente pasa a semestral o anual. Mezclarlos daría un
+descuento encima de otro que nadie pactó.
 
 **Sede adicional = cantidad, no línea aparte.** El precio es uniforme y no hay metadata
 por sede. Lo que se pierde es saber cuándo se agregó cada una; eso lo cubre
@@ -259,6 +308,20 @@ El cliente ya pagó ese tiempo; lo que compra es más nivel por el mismo tiempo.
 > (56.000/mes). El saldo compra más días del plan barato y el vencimiento se corre.
 
 **Nunca se devuelve plata.** Un downgrade compra tiempo, no un reembolso.
+
+#### Por qué el período no se reinicia
+
+La versión anterior de esta política era "el período se reinicia y se cobra la
+diferencia". Con el upgrade funcionaba; con el downgrade abría un agujero:
+
+> Profesional anual, mes 11, se pasa a Esencial anual. La diferencia es negativa, así
+> que no se cobra nada. Y el período se reinicia: **doce meses de Esencial gratis.**
+
+Cualquier cliente anual podía renovar sin pagar bajando de plan cerca del vencimiento.
+Con dos clientes que conocés por el nombre no iba a pasar; con veinte, sí.
+
+Convertir el saldo lo cierra por construcción: el downgrade no regala tiempo, compra
+tiempo con plata que ya estaba paga. No hay nada que explotar porque no hay nada gratis.
 
 #### Reglas de cálculo
 

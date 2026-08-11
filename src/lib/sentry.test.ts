@@ -94,6 +94,9 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'suscripciones', columna: 'precio_base_mensual', ejemplo: 75000 },
   { tabla: 'suscripciones', columna: 'precio_sede_adicional', ejemplo: 60000 },
   { tabla: 'suscripciones', columna: 'descuento_pct', ejemplo: 30 },
+  // Cargo de única vez congelado (006-monto-implementacion.sql). Filtrado: es
+  // plata del contrato de un cliente concreto, no un valor de catálogo.
+  { tabla: 'suscripciones', columna: 'monto_implementacion', ejemplo: 250000 },
   { tabla: 'suscripciones', columna: 'estado_implementacion', ejemplo: 'exonerada', permitida: true },
   { tabla: 'suscripciones', columna: 'fecha_inicio', ejemplo: '2026-01-15' },
   { tabla: 'suscripciones', columna: 'proximo_cobro', ejemplo: '2026-09-01' },

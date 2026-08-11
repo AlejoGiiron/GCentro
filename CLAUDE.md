@@ -19,6 +19,20 @@ Si el código termina contradiciendo el documento, **se actualiza el documento e
 el mismo commit** que introduce el cambio. Un documento que quedó atrás del repo
 es peor que no tener documento: se sigue leyendo y ya miente.
 
+**Es el ÚNICO `.md` de `docs/` que es fuente de verdad.** Si aparece otro
+—planilla de trabajo, borrador, tabla que alguien llenó a mano en una
+conversación—, **no** es fuente de verdad: puede tener números viejos, preguntas
+sin responder o decisiones que se revirtieron. No derives nada de ahí y no lo
+uses para "corregir" el documento de diseño. **Preguntá.**
+
+Pasó una vez: `docs/g-centro-planes-de-cobro.md` tenía precios de lista distintos
+a los del esquema y una regla de redondeo que ya se había descartado. Si se
+hubiera tomado como fuente, el catálogo salía con los precios equivocados.
+
+Cuando el contenido de una planilla así ya esté fusionado acá, se borra. No se
+deja "por las dudas": una segunda copia con números viejos es exactamente el
+problema que la regla evita.
+
 ### 2. Este hilo NUNCA toca otro repo
 
 **Solo se trabaja sobre G-Centro.** No se abre, no se lee y no se modifica
