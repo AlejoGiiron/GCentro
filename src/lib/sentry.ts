@@ -221,6 +221,10 @@ const CLAVE_PERMITIDA = new Set([
   'codigo', 'termino', 'estado', 'estado_anterior', 'estado_nuevo',
   'estado_implementacion', 'tipo', 'concepto', 'metodo', 'valor_deseado',
   'activo', 'incluye_dian',
+  // Marca de tenant de laboratorio. Es un booleano de catálogo: dice qué clase
+  // de fila es, no nada sobre el cliente. Y es justo el que hace falta para
+  // entender un error raro ("¿esto pasó en LAB o con un cliente real?").
+  'es_prueba',
   // Conteos y tasas de catálogo cerrado.
   'meses', 'iva_pct', 'sedes_adicionales', 'intentos',
   'termino_descuento_pct',

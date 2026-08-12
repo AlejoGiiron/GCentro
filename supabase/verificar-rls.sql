@@ -13,15 +13,15 @@
 -- bajarse a un rol que sí la respeta — sin ese cambio de rol la verificación
 -- daría "todo se lee" y no probaría nada.
 --
--- Cubre las NUEVE tablas. Las cinco de negocio son las que tienen la PII y la
+-- Cubre las NUEVE tablas y las DOS vistas. Las cinco de negocio son las que tienen la PII y la
 -- plata: son exactamente las que no pueden quedar afuera de esta prueba.
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- PRUEBA 1 — usuario autenticado SIN fila en admins
--- Esperado: 0 en las nueve filas.
+-- Esperado: 0 en las once filas.
 --
--- `terminos` (3 filas), `productos` (3), `planes` (2), `clientes` (2) y
--- `suscripciones` (2) son las que importan: tienen datos cargados, así que un
+-- `terminos` (3 filas), `productos` (3), `planes` (2), `clientes` (3) y
+-- `suscripciones` (3) son las que importan: tienen datos cargados, así que un
 -- 0 ahí es RLS bloqueando de verdad y no una tabla vacía.
 -- ══════════════════════════════════════════════════════════════════════════
 begin;
@@ -38,12 +38,16 @@ begin;
   union all select 'suscripciones',        count(*) from public.suscripciones
   union all select 'suscripcion_eventos',  count(*) from public.suscripcion_eventos
   union all select 'pagos',                count(*) from public.pagos
-  union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes;
+  union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes
+  -- Las vistas tambien: con security_invoker deben respetar la RLS de las
+  -- tablas base. Si alguna devuelve filas aca, la vista es un agujero.
+  union all select 'VISTA clientes_cobrables',      count(*) from public.clientes_cobrables
+  union all select 'VISTA suscripciones_cobrables', count(*) from public.suscripciones_cobrables;
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- PRUEBA 2 — anónimo (sin sesión)
--- Esperado: 0 en las nueve filas. auth.uid() es null → es_admin() da false.
+-- Esperado: 0 en las once filas. auth.uid() es null → es_admin() da false.
 -- ══════════════════════════════════════════════════════════════════════════
 begin;
   set local role anon;
@@ -56,7 +60,11 @@ begin;
   union all select 'suscripciones',        count(*) from public.suscripciones
   union all select 'suscripcion_eventos',  count(*) from public.suscripcion_eventos
   union all select 'pagos',                count(*) from public.pagos
-  union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes;
+  union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes
+  -- Las vistas tambien: con security_invoker deben respetar la RLS de las
+  -- tablas base. Si alguna devuelve filas aca, la vista es un agujero.
+  union all select 'VISTA clientes_cobrables',      count(*) from public.clientes_cobrables
+  union all select 'VISTA suscripciones_cobrables', count(*) from public.suscripciones_cobrables;
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════
@@ -95,17 +103,19 @@ rollback;
 -- Reemplazá el UUID por el de tu usuario admin real (el que insertaste en
 -- `admins` desde el dashboard) y descomentá el bloque.
 --
--- Esperado, con todas las migraciones aplicadas:
---   admins               1 o más
---   productos            3   (g-vento, g-mura, g-quota)
---   terminos             3   (mensual, semestral, anual — el trimestral se
---                             eliminó en 002-terminos-corregidos.sql)
---   planes               2   (Esencial, Profesional)
---   clientes             2   (G-10, Salchimelo)
---   suscripciones        2
---   suscripcion_eventos  2   (una CREADA por suscripción)
---   pagos                0
---   banderas_pendientes  0
+-- Esperado, con las SIETE migraciones aplicadas:
+--   admins                          1 o más
+--   productos                       3   (g-vento, g-mura, g-quota)
+--   terminos                        3   (mensual, semestral, anual — el
+--                                        trimestral se eliminó en 002)
+--   planes                          2   (Esencial, Profesional)
+--   clientes                        3   (G-10, Salchimelo, LAB)
+--   suscripciones                   3
+--   suscripcion_eventos             3   (una CREADA por suscripción)
+--   pagos                           0
+--   banderas_pendientes             0
+--   VISTA clientes_cobrables        2   ← LAB queda afuera: es la prueba de
+--   VISTA suscripciones_cobrables   2      que el filtro de es_prueba funciona
 -- ══════════════════════════════════════════════════════════════════════════
 -- begin;
 --   set local request.jwt.claims = '{"sub":"PEGA-ACA-TU-UUID","role":"authenticated"}';
@@ -119,5 +129,7 @@ rollback;
 --   union all select 'suscripciones',        count(*) from public.suscripciones
 --   union all select 'suscripcion_eventos',  count(*) from public.suscripcion_eventos
 --   union all select 'pagos',                count(*) from public.pagos
---   union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes;
+--   union all select 'banderas_pendientes',  count(*) from public.banderas_pendientes
+--   union all select 'VISTA clientes_cobrables',      count(*) from public.clientes_cobrables
+--   union all select 'VISTA suscripciones_cobrables', count(*) from public.suscripciones_cobrables;
 -- rollback;

@@ -277,6 +277,33 @@ describe('invariantes del cambio de plan', () => {
     }
   })
 
+  it('bajar a un plan de precio CERO falla ruidoso, no escribe una fecha rota', () => {
+    // Alcanzable desde que existe LAB (tenant de pruebas, precio 0). Sin la
+    // guarda, `saldo / 0` da Infinity y de ahí sale un Invalid Date que se
+    // guardaría en la base sin que nadie lo mire.
+    const gratis = tarifa(0, 0, 0, TERMINOS.anual)
+    expect(() => calcularCambioDePlan(profesionalAnual, gratis, PERIODO_ANUAL, CAMBIO)).toThrow(
+      /precio cero/i,
+    )
+  })
+
+  it('dos suscripciones de precio cero no rompen: no hay cambio que calcular', () => {
+    // El caso real de LAB consigo mismo: tarifas iguales, corta antes de dividir.
+    const gratis = tarifa(0, 0, 0, TERMINOS.mensual)
+    const r = calcularCambioDePlan(gratis, gratis, PERIODO_ANUAL, CAMBIO)
+    expect(r.tipo).toBe('sin_cambio')
+    expect(r.saldo_a_favor).toBe(0)
+  })
+
+  it('SUBIR desde un plan de precio cero funciona normal', () => {
+    // LAB pasando a un plan pago: la guarda es solo para el divisor.
+    const gratis = tarifa(0, 0, 0, TERMINOS.anual)
+    const r = calcularCambioDePlan(gratis, esencialAnual, PERIODO_ANUAL, CAMBIO)
+    expect(r.tipo).toBe('upgrade')
+    expect(r.saldo_a_favor).toBe(0)
+    expect(r.periodo_actual_fin).toBe('2026-12-31')
+  })
+
   it('cambiar al mismo plan no cobra ni mueve nada', () => {
     const r = calcularCambioDePlan(esencialAnual, esencialAnual, PERIODO_ANUAL, CAMBIO)
     expect(r.tipo).toBe('sin_cambio')

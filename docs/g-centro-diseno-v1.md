@@ -3,11 +3,17 @@
 Panel de control de suscripciones. Producto nuevo, repo nuevo, proyecto de Supabase aparte.
 No comparte nada con G-Vento salvo una columna.
 
-Estado del documento: **Bloques 1 y 2 escritos.** Catálogo, `admins`, RLS y auth
-(`schema-inicial.sql`, aplicado). Tablas de negocio, precios de lista, los dos clientes
-reales y el modelo de cobro (migraciones 002 a 005, **pendientes de aplicar**).
-Resueltas: IVA (§9.1), cobro anticipado (§9.2), implementación exonerada (§9.3).
-Falta todo lo de §5 — la bandera y sus Edge Functions — y la UI.
+Estado del documento: **Bloques 1 y 2 escritos; Bloque 3 empezado.** Catálogo, `admins`,
+RLS y auth (`schema-inicial.sql`, aplicado). Tablas de negocio, precios de lista, los dos
+clientes reales, el modelo de cobro, el monto de implementación y el tenant de pruebas
+(migraciones 002 a 007, **pendientes de aplicar**).
+
+Resueltas: IVA (§9.1), cobro anticipado (§9.2), implementación exonerada (§9.3),
+`organizacion_externa_id` (§9.4).
+
+Falta: los **valores** del enum de `subscription_status` (§9.5) — sin eso no se puede
+escribir el cliente de la Edge Function—, la URL y el secreto HMAC, el resto de §5, y
+toda la UI.
 
 ---
 
@@ -90,10 +96,33 @@ El secreto de escritura **no** vive acá. Va en variables de entorno de la Edge 
 ### clientes
 
 `id` · `nombre_comercial` · `razon_social` · `nit` · `contacto_nombre` ·
-`contacto_email` · `contacto_telefono` · `notas` · `creado_en`
+`contacto_email` · `contacto_telefono` · `notas` · `es_prueba` `boolean` · `creado_en`
 
 La entidad comercial. G-10 y Salchimelo existen una sola vez aunque mañana compren
 tres productos.
+
+#### `es_prueba` y el tenant de laboratorio
+
+**LAB no es un cliente: es el laboratorio.** Existe como fila real, con su
+`organizacion_externa_id` de verdad, para poder ejercitar el circuito completo de la
+bandera (§5) sin tocar a un cliente que paga. Probar el camino entero contra una
+organización real es lo único que verifica que el puente funciona; simularlo no.
+
+`es_prueba` es `not null default false`, y el default no es un detalle: con la columna
+nullable o con default `true`, un cliente nuevo podría **nacer invisible para la
+cobranza** por un olvido en un INSERT. El modo de fallo tiene que ser "aparece aunque no
+debería", nunca "no aparece y nadie lo nota".
+
+**La exclusión va por VISTAS, no por convención.** `clientes_cobrables` y
+`suscripciones_cobrables` filtran los tenants de prueba y son el camino por default;
+para INCLUIR a LAB hay que ir explícitamente a la tabla base. Si la exclusión fuera un
+`WHERE` que cada consulta tiene que acordarse de escribir, falla la primera vez que
+alguien copia un SELECT sin él — y falla hacia el lado silencioso, inflando un total de
+cobranza con datos de prueba.
+
+Las dos vistas llevan `security_invoker = true`. Sin eso correrían con los permisos de
+su dueño y se saltearían RLS: serían un agujero por donde `anon` leería `clientes`
+entero, esquivando toda la política de §8.
 
 ### planes
 
@@ -408,18 +437,61 @@ domingo a las diez de la noche deja a un bar sin poder cobrar.
 
 ---
 
-## 6. Cambios en G-Vento
+## 6. El lado del producto
 
-Tres columnas nuevas en `organizaciones`:
+Lo que sigue lo decidió e implementó el equipo del producto. Se documenta acá porque
+define el contrato del puente, no porque se controle desde este repo.
 
-- `estado_suscripcion` `text` not null default `'activa'`
-- `mensaje_suscripcion` `text` nullable — texto que se escribe desde el panel
-- `estado_suscripcion_actualizado_en` `timestamptz`
+### Los nombres cruzan el límite: la traducción vive de este lado
+
+**El producto nombró sus columnas en inglés.** Nosotros usamos español por la convención
+Giiron (§2). No se les pide que cambien: es su repo y su convención, y una convención
+ajena no es un bug.
+
+| Concepto | Allá (`organizaciones`) | Acá |
+|---|---|---|
+| Nivel de gating | `subscription_status` (default `'active'`) | `banderas_pendientes.valor_deseado` |
+| Mensaje del banner | `subscription_message` | mensaje del panel |
+| Cuándo cambió | `subscription_updated_at` | — (se deriva) |
+
+**La traducción vive en UN SOLO LUGAR: el cliente de la Edge Function, de nuestro lado.**
+Ni en la base, ni en los hooks, ni en la UI. Adentro del panel todo es español; el inglés
+existe únicamente en el borde que habla con el producto.
+
+Un mapeo de nombres esparcido en varios archivos es cómo se termina con dos traducciones
+que discrepan, y el síntoma aparece del otro lado —en la base de un cliente— donde no se
+puede depurar.
+
+> ⚠️ **PENDIENTE — los VALORES del enum no están confirmados.**
+>
+> Lo único que consta es que `subscription_status` tiene default `'active'`. Los otros
+> cuatro niveles de nuestra escalera (`por_vencer`, `gracia`, `restringida`,
+> `suspendida`) **no tienen traducción confirmada**, y la obvia puede no ser la real:
+> puede que su enum tenga menos valores, o distintos, o que acepte texto libre.
+>
+> Mapear a ciegas y escribir un valor que su lado no entiende es peor que no escribir:
+> con fail-open (§5) un valor desconocido probablemente se lea como `activa`, o sea que
+> **una suspensión se convertiría en silencio en "todo bien"**. No se asume: se pregunta
+> antes de escribir el cliente.
+
+### Las tres columnas
+
+- `subscription_status` `text` not null default `'active'`
+- `subscription_message` `text` nullable — texto que se escribe desde el panel
+- `subscription_updated_at` `timestamptz`
+
+**`subscription_updated_at` significa "cuándo CAMBIÓ el estado", no "cuándo se llamó".**
+Re-aplicar el mismo estado no mueve el timestamp. Eso es lo que permite contar desde
+cuándo corre la gracia: si cada reintento del outbox lo pisara, el contador se
+reiniciaría solo y nunca se sabría hace cuánto que un cliente está vencido.
+
+Si hiciera falta registrar cada llamada —para auditar reintentos— eso va en
+`banderas_pendientes`, de este lado, que ya existe y para eso está.
 
 **RLS:** legible por los miembros de la organización. Escribible por nadie. Solo la Edge
 Function `aplicar-estado`, con service role, puede tocarla. Los usuarios del cliente no
 deben poder actualizar su propio estado — es exactamente la clase de escalada de
-privilegios que ya se cerró en G-Vento.
+privilegios que ya se cerró allá.
 
 ### La escalera
 
@@ -428,14 +500,48 @@ privilegios que ya se cerró en G-Vento.
 | `activa` | Nada. |
 | `por_vencer` | Aviso descartable. |
 | `gracia` | Banner persistente arriba. Todo funciona. |
-| `restringida` | Banner + se bloquean reportes, configuración, exportaciones masivas y gestión de usuarios. |
-| `suspendida` | No se abren turnos nuevos. |
+| `restringida` | Banner + se bloquean módulos administrativos: reportes, configuración, gestión de usuarios. |
+| `suspendida` | Banner permanente + los mismos bloqueos administrativos. |
 
 **Nunca se bloquea, en ningún nivel:** vender, cobrar, imprimir, facturar a la DIAN,
-cerrar una caja ya abierta, y exportar los propios datos.
+abrir o cerrar un turno, y exportar.
 
 La facturación electrónica es una obligación legal del cliente. Meterse en el medio de
 eso lo convierte en tu problema legal.
+
+#### Por qué `suspendida` ya no bloquea la apertura de turnos
+
+Era el diseño original y estaba mal, por dos razones que solo se ven conociendo el flujo
+del POS:
+
+- **Vender exige turno abierto.** Bloquear la apertura ES bloquear la venta — con el
+  agravante de que el golpe llega con un día de retraso y cae a la mañana, con el local
+  abriendo y clientes esperando. Es exactamente el escenario que §5 (fail-open) existe
+  para evitar, entrando por otra puerta.
+- **Agregar ítems a una mesa NO requiere turno.** Un bar suspendido seguiría acumulando
+  consumos que después no puede cobrar, porque cobrar sí necesita turno. La restricción
+  no cobra: genera consumo incobrable.
+
+#### Por qué el export no se bloquea nunca
+
+En el POS es **un solo botón** que es a la vez "exportación masiva" y "exportar los
+propios datos". Separarlos exigiría un criterio arbitrario sobre cuántas filas son
+"masivas", y equivocarse hacia el lado restrictivo significa impedirle a un cliente
+sacar sus propios datos — que es justo lo que la lista de nunca-bloquear protege.
+
+#### Consecuencia: la escalera tiene menos escalones de los que se diseñó
+
+Con estos ajustes, **`restringida` y `suspendida` quedan casi idénticas en efecto real**:
+las dos muestran banner y bloquean lo administrativo. La diferencia práctica es el tono
+del mensaje, no la capacidad.
+
+No se disimula ni se inventa un bloqueo nuevo para diferenciarlas. La palanca real de
+cobranza en los niveles altos **es el mensaje del banner**, y conviene tratarlo como tal:
+es el campo que hay que poder escribir bien desde el panel, no un adorno de la fila.
+
+Si en algún momento hace falta un escalón que muerda de verdad, se diseña con el mismo
+criterio de esta sección —qué deja de funcionar y a quién le llega el golpe— y no
+agregando un bloqueo porque la tabla tenga un renglón vacío.
 
 ### Gating solo en la UI
 
@@ -633,8 +739,21 @@ cobrarle la implementación ahí sería cobrarle dos veces por irse.
 Implementado en `transicionImplementacion()` (`src/lib/cobro.ts`), con los estados
 terminales (`cobrada`, `exonerada`) blindados contra cualquier evento.
 
-### 9.4 Pendientes
+### 9.4 `organizacion_externa_id` — RESUELTA
 
-1. **`organizacion_externa_id`.** ¿El producto ya tiene tabla de organizaciones con id
-   estable, y G-10 y Salchimelo ya son filas ahí? De eso depende si el puente existe o
-   hay que construirlo antes. Hoy las dos suscripciones lo tienen en `NULL`.
+El producto tiene tabla de organizaciones con ids estables, y las tres organizaciones
+(G-10, Salchimelo y LAB) ya son filas ahí. Cargados en `007`.
+
+Son estables porque nada en esa app reescribe la tabla, el onboarding reutiliza el id si
+el nombre ya existe, y le están agregando un unique al nombre.
+
+**Se guarda SIEMPRE el UUID, nunca el nombre.** El nombre es texto editable: guardarlo
+convertiría un renombre cosmético del otro lado en una suscripción huérfana de este.
+
+### 9.5 Pendientes
+
+1. **Los VALORES del enum de `subscription_status`** (§6). Solo consta el default
+   `'active'`. Sin los otros cuatro confirmados no se puede escribir el cliente de la
+   Edge Function: con fail-open, mandar un valor que el producto no entienda convierte
+   una suspensión en "todo bien", y en silencio.
+2. **La URL de la Edge Function y el secreto HMAC**, para completar §5.

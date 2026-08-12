@@ -86,6 +86,9 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'clientes', columna: 'contacto_email', ejemplo: 'juan@g10.co' },
   { tabla: 'clientes', columna: 'contacto_telefono', ejemplo: '3001234567' },
   { tabla: 'clientes', columna: 'notas', ejemplo: 'Debe dos meses, hablar con Ana' },
+  // PERMITIDA (007): booleano de catálogo. Dice qué clase de fila es, no nada
+  // sobre el cliente — y es el que responde "¿esto pasó en LAB o en producción?".
+  { tabla: 'clientes', columna: 'es_prueba', ejemplo: true, permitida: true },
 
   // ── suscripciones (003-tablas-negocio.sql) ────────────────────────────────────────
   { tabla: 'suscripciones', columna: 'termino', ejemplo: 'anual', permitida: true },

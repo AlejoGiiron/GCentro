@@ -184,6 +184,19 @@ export function calcularCambioDePlan(
   // DOWNGRADE: no se devuelve plata. El saldo compra días del plan nuevo, que
   // por ser más barato son MÁS días. Se trunca a favor de la casa por el día
   // fraccionado: el cliente igual queda con más tiempo del que tenía.
+  //
+  // ⚠️ Guarda contra la tarifa CERO. Un plan gratis no tiene tasa de conversión:
+  // el saldo compraría tiempo infinito. `saldo / 0` da `Infinity`, y de ahí sale
+  // una fecha `Invalid Date` que se guardaría en la base sin que nadie la mire.
+  // Es alcanzable desde que existe el tenant de pruebas (LAB, precio 0), así que
+  // no es hipotético. Falla ruidoso en vez de escribir una fecha rota.
+  if (tarifaNueva <= 0) {
+    throw new Error(
+      'No se puede convertir un saldo hacia un plan de precio cero: no hay tasa de conversión. ' +
+        'Si la suscripción es de prueba, no debería pasar por un cambio de plan.',
+    )
+  }
+
   const diasNuevos = Math.floor(saldo / tarifaNueva)
   // `- 1` porque el día del cambio ya cuenta como cubierto (el período es
   // cerrado en ambos extremos). Sin esto la fecha se corre un día de más.
