@@ -254,6 +254,10 @@ const CLAVE_PERMITIDA = new Set([
   // exactamente la clase de campo donde ya se comprobó que cae un nombre
   // propio. Se ve en el panel; a Sentry no va.
   'nivel', 'regla', 'changed',
+  // `banderas_pendientes.cambio_efectivo` (009): el mismo booleano que
+  // `changed`, con el nombre en español que le toca por ser columna nuestra
+  // (§2). Las dos claves existen porque el dato cruza el límite y vuelve.
+  'cambio_efectivo',
 ])
 
 // ── Redacción TIPADA ──────────────────────────────────────────────────────

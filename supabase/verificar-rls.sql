@@ -103,7 +103,7 @@ rollback;
 -- Reemplazá el UUID por el de tu usuario admin real (el que insertaste en
 -- `admins` desde el dashboard) y descomentá el bloque.
 --
--- Esperado, con las OCHO migraciones aplicadas (002…008):
+-- Esperado, con las NUEVE migraciones aplicadas (002…009):
 --   admins                          1 o más
 --   productos                       3   (g-vento, g-mura, g-quota)
 --   terminos                        3   (mensual, semestral, anual — el
@@ -113,7 +113,8 @@ rollback;
 --   suscripciones                   3
 --   suscripcion_eventos             3   (una CREADA por suscripción)
 --   pagos                           0
---   banderas_pendientes             0
+--   banderas_pendientes             3+  (la prueba en vivo del 13/08 contra LAB
+--                                        dejó tres filas; ya no es 0)
 --   VISTA clientes_cobrables        2   ← LAB queda afuera: es la prueba de
 --   VISTA suscripciones_cobrables   2      que el filtro de es_prueba funciona
 -- ══════════════════════════════════════════════════════════════════════════

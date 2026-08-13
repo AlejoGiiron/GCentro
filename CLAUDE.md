@@ -173,12 +173,20 @@ negocio; modelo de cobro y de cambio de plan (`src/lib/cobro.ts`); LAB y las
 vistas `*_cobrables`; el puente hacia G-Vento (`supabase/functions/`) con
 derivación del nivel, traducción, firma HMAC, outbox y reintentos.
 
-Pendiente de Alejandro: aplicar `008`; regenerar los tipos; desplegar
-`sincronizar-bandera` con `GVENTO_HMAC_SECRETO`; **ejercitar el circuito contra
-LAB** (`f4fa692d-6cf3-43fb-a17f-18b8b163c918`), nunca contra G-10 ni Salchimelo.
+**El camino real corrió (13/08/2026).** Tres llamadas contra LAB, tres 200,
+`intentos:1` en las tres: el HMAC cerró a la primera contra la `aplicar-estado`
+real. De ahí salieron `cambio_efectivo` (009) y la propagación de
+`subscription_updated_at`.
 
-⚠️ **El camino real del puente NO se corrió.** Todo lo verificado es contra un
-doble de `aplicar-estado` escrito desde el contrato en papel (regla 4).
+Pendiente de Alejandro: aplicar `009` y regenerar los tipos.
+
+⚠️ Sin correr en vivo todavía: los **caminos de error** (400 por valor
+inválido, 422 por suscripción sin `organizacion_externa_id`). Solo probados
+contra el doble.
+
+**Toda prueba en vivo va contra LAB** (`f4fa692d-6cf3-43fb-a17f-18b8b163c918`),
+nunca contra G-10 ni Salchimelo: una prueba les pondría un banner de cobranza
+en la pantalla de venta, en vivo, en el mostrador.
 
 Sin cargar: los precios de `planes` (falta el número del contador).
 

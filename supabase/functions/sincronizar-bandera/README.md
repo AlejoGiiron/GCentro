@@ -70,13 +70,16 @@ Y después dejarlo como estaba:
 
 | | Esperado |
 |---|---|
-| Primera llamada | `200 {"ok":true,"changed":true,...}` |
-| Repetirla igual | `200 {"ok":true,"changed":false,...}` — idempotencia |
+| Primera llamada | `200 {"ok":true,"changed":true,"subscription_updated_at":"…"}` |
+| Repetirla igual | `200 {"ok":true,"changed":false,…}` con el **mismo** `subscription_updated_at` — eso es la idempotencia |
 | `banderas_pendientes` | una fila por llamada, `confirmado_en` con valor |
 | Con el secreto mal | `502` y `bandera_error_codigo = 'HMAC_INVALIDO'` |
 
+La primera llamada tarda ~2s por arranque en frío; las siguientes ~0.5s.
+
 ```sql
-select valor_deseado, intentos, bandera_error_codigo, confirmado_en, creado_en
+select valor_deseado, intentos, cambio_efectivo, bandera_error_codigo,
+       confirmado_en, creado_en
   from public.banderas_pendientes
  order by creado_en desc limit 5;
 ```

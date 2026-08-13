@@ -195,6 +195,9 @@ Deno.serve(async (peticion) => {
       confirmado_en: resultado.ok ? new Date().toISOString() : null,
       ultimo_error: resultado.ok ? null : (resultado.error ?? null),
       bandera_error_codigo: resultado.ok ? null : (resultado.codigo ?? 'DESCONOCIDO'),
+      // `?? null` y no `?? false`: si el 200 vino con un cuerpo ilegible no
+      // sabemos si cambió algo, y decir "no cambió" sería inventarlo (ver 009).
+      cambio_efectivo: resultado.ok ? (resultado.changed ?? null) : null,
     })
     .eq('id', bandera.id)
 
@@ -228,6 +231,19 @@ Deno.serve(async (peticion) => {
       // `false` significa que el producto YA estaba en ese estado. No es un
       // error: es idempotencia, y `subscription_updated_at` no se movió.
       changed: resultado.changed,
+      // ⚠️ SE DEVUELVE PERO NO SE GUARDA, y las dos mitades son deliberadas.
+      //
+      // No se guarda porque los días de gracia se cuentan contra NUESTRO
+      // `proximo_cobro` (§4), que es el dato del contrato; duplicar el reloj
+      // del otro sistema sería estado que hay que mantener sincronizado sin
+      // que nadie lo consulte.
+      //
+      // Se devuelve porque sin él la idempotencia solo se puede creer, no
+      // comprobar: `changed:false` es un booleano que calcula el otro lado,
+      // mientras que dos llamadas con el MISMO timestamp son la evidencia de
+      // que efectivamente no se movió nada. Salió de la prueba en vivo, donde
+      // no haberlo devuelto dejó ese paso sin verificar.
+      subscription_updated_at: resultado.subscription_updated_at,
       intentos: resultado.intentos,
     },
     200,

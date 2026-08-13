@@ -132,6 +132,9 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // de sync existe `bandera_error_codigo`, que es un enum derivado.
   { tabla: 'banderas_pendientes', columna: 'ultimo_error', ejemplo: 'HMAC invalido para org de Juan Perez' },
   { tabla: 'banderas_pendientes', columna: 'bandera_error_codigo', ejemplo: 'HMAC_INVALIDO', permitida: true },
+  // 009. El `changed` del contrato guardado de este lado, en español. Booleano
+  // del protocolo de sincronización: no dice nada de nadie.
+  { tabla: 'banderas_pendientes', columna: 'cambio_efectivo', ejemplo: false, permitida: true },
 
   // ── El puente hacia G-Vento (§5 y §6) ────────────────────────────────────
   // No son columnas de NUESTRO esquema: son las claves que cruzan el límite,
@@ -156,6 +159,15 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'bandera.ts', columna: 'regla', ejemplo: 'GRACIA_PROLONGADA', permitida: true },
   // Idempotencia: `false` = el producto ya estaba así. Un booleano sin sujeto.
   { tabla: 'contrato', columna: 'changed', ejemplo: false, permitida: true },
+  // FILTRADO, y vale explicar por qué: no lleva PII, pero tampoco está
+  // declarado en el allowlist, y bajo allowlist lo no declarado se pierde —
+  // ese es el punto de haberlo invertido. Además no pasaría el chequeo de
+  // forma aunque estuviera: `RE_CONSTANTE` no acepta el `+` del huso, así que
+  // permitirlo daría la falsa impresión de que sobrevive. Sale como
+  // `[Filtrado:string(29)]`, que igual dice "acá había un timestamp".
+  // En modo SOBRE (prosa) las fechas ISO sí sobreviven; la asimetría es del
+  // diseño de los dos modos, no un descuido.
+  { tabla: 'contrato', columna: 'subscription_updated_at', ejemplo: '2026-08-13T15:46:41.45+00:00' },
 ]
 
 const FILTRADAS = COLUMNAS_DEL_ESQUEMA.filter((c) => !c.permitida)

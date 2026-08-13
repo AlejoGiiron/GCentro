@@ -273,8 +273,13 @@ sabés cómo se comporta el modelo.
 Cola de escritura hacia los productos. Ver §5.
 
 `id` · `suscripcion_id` fk · `valor_deseado` `text` · `intentos` `smallint` ·
-`ultimo_error` `text` · `bandera_error_codigo` `text` · `confirmado_en` `timestamptz`
-nullable · `creado_en`
+`ultimo_error` `text` · `bandera_error_codigo` `text` · `cambio_efectivo` `boolean`
+nullable · `confirmado_en` `timestamptz` nullable · `creado_en`
+
+`cambio_efectivo` es el `changed` de la respuesta, guardado de este lado y en español
+porque es columna nuestra (§2). **El null significa algo:** `confirmado_en` lleno con
+`cambio_efectivo` en null es un 200 con cuerpo ilegible — el estado se aplicó y el detalle
+se perdió. Un `DEFAULT FALSE` diría "no cambió nada" donde lo cierto es "no sabemos".
 
 `ultimo_error` es el texto crudo y **no viaja a Sentry**: es texto libre y ya se comprobó
 que ahí termina cayendo un nombre propio. Para diagnóstico externo va
@@ -475,6 +480,30 @@ caída de G-Centro.
 ya estaba en ese estado, que es exactamente lo que la columna afirma. La idempotencia no
 es un fallo.
 
+#### La cola crece por LLAMADA, no por cambio de estado
+
+Cada invocación deja su fila, aplique o no aplique algo. **Es una propiedad, no un
+accidente:** es el registro de auditoría que §6 pide de este lado, y es lo que permite
+contestar "¿cuántas veces se intentó y cuándo?" — que es justo lo que se pregunta cuando
+algo no cuadra entre los dos sistemas.
+
+La consecuencia es que la tabla crece con cada clic. Por eso existe `cambio_efectivo`
+(§3): sin ella, dos filas consecutivas con el mismo `valor_deseado` son indistinguibles
+salvo por la hora, y no hay forma de saber cuál movió algo del otro lado. Cuando la cola
+tenga pantalla, lo que se muestra por defecto es lo **no confirmado**; el historial
+completo es otra vista.
+
+#### La primera llamada del día tarda ~2s
+
+Medido en la prueba en vivo: `creado_en` → `confirmado_en` dio **1.99s** en la primera
+llamada y **~0.5s** en las siguientes. La diferencia es arranque en frío de las Edge
+Functions, y hay dos en el camino.
+
+Con 10s de timeout por intento sobra margen, así que no es un problema de corrección.
+**Es un requisito de UI:** el botón de confirmar necesita estado de carga visible desde el
+primer clic. Dos segundos sin respuesta es exactamente el intervalo en el que alguien
+aprieta de nuevo — y acá apretar de nuevo escribe otra fila en la cola.
+
 #### Qué se reintenta y qué no
 
 Tres intentos, y **solo lo transitorio**: `TIMEOUT`, `RED`, `HTTP_5XX`.
@@ -575,9 +604,20 @@ cuándo corre la gracia: si cada reintento del outbox lo pisara, el contador se
 reiniciaría solo y nunca se sabría hace cuánto que un cliente está vencido.
 
 Si hiciera falta registrar cada llamada —para auditar reintentos— eso va en
-`banderas_pendientes`, de este lado, que ya existe y para eso está. **No se guarda
-`subscription_updated_at` de vuelta:** los días de gracia se cuentan contra nuestro
-`proximo_cobro` (§4), que es el dato del contrato, no contra el reloj del otro sistema.
+`banderas_pendientes`, de este lado, que ya existe y para eso está.
+
+**`subscription_updated_at` se DEVUELVE pero no se GUARDA**, y las dos mitades son
+deliberadas:
+
+- **No se guarda** porque los días de gracia se cuentan contra nuestro `proximo_cobro`
+  (§4), que es el dato del contrato. Duplicar el reloj del otro sistema sería estado que
+  hay que mantener sincronizado sin que nadie lo consulte.
+- **Se devuelve** porque sin él la idempotencia solo se puede creer, no comprobar.
+  `changed:false` es un booleano que calcula el otro lado; dos llamadas con el **mismo
+  timestamp** son la evidencia de que efectivamente no se movió nada. Salió de la prueba
+  en vivo del 13/08/2026, donde no devolverlo dejó ese paso sin verificar: las dos
+  llamadas idénticas dieron `changed:true` y `changed:false` como se esperaba, pero el
+  timestamp no era observable desde este lado.
 
 #### El largo del mensaje lo pone G-Centro: 280 caracteres
 
@@ -881,17 +921,27 @@ los códigos de respuesta. Documentado en §5 y §6, implementado en
 El secreto HMAC va por variable de entorno de la Edge Function (`GVENTO_HMAC_SECRETO`),
 nunca en el repo ni en el bundle.
 
-### 9.6 Pendientes
+### 9.6 El camino real — CORRIDO (13/08/2026)
 
-1. **El camino real del puente no se corrió.** Todo lo verificado es contra un doble de
-   `aplicar-estado` escrito desde el contrato en papel. Si el código de ellos hace algo
-   distinto de lo que el contrato dice, los tests no lo ven. Falta desplegar
-   `sincronizar-bandera`, cargar el secreto y ejercitar el circuito **contra LAB**.
-2. **El reintento en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
+El circuito se ejercitó contra LAB de punta a punta. Tres llamadas, tres 200, `intentos:1`
+en las tres: el HMAC cerró a la primera contra la `aplicar-estado` real, no contra el
+doble. `changed` dio `true` / `false` / `true` como se esperaba, y las tres filas quedaron
+con `confirmado_en` lleno y `bandera_error_codigo` en null.
+
+De ahí salieron `cambio_efectivo` (009), la propagación de `subscription_updated_at`, y
+las dos observaciones de §5 sobre el arranque en frío y el crecimiento de la cola.
+
+**Todavía sin correr en vivo:** los caminos de error (400 por valor inválido, 422 por
+suscripción sin `organizacion_externa_id`). Están probados contra el doble.
+
+### 9.7 Pendientes
+
+1. **El reintento en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
    del panel. Una fila que queda sin `confirmado_en` porque G-Vento estaba caído no se
    vuelve a intentar sola: alguien tiene que apretar de nuevo. Alcanza mientras sean dos
    clientes y el panel muestre la cola sin confirmar; con más, hace falta un barrido
    periódico. El índice parcial de `banderas_pendientes` ya está para eso.
-3. **La UI.** Nada de esto tiene pantalla todavía: el nivel se deriva y se envía, pero el
-   botón de confirmar, la cola de pendientes y el editor del mensaje del banner —que
-   según §6 es la palanca real de cobranza— son del bloque que viene.
+2. **La UI.** Nada de esto tiene pantalla todavía: el nivel se deriva y se envía, pero el
+   botón de confirmar —con estado de carga, ver §5—, la cola de pendientes y el editor del
+   mensaje del banner —que según §6 es la palanca real de cobranza— son del bloque que
+   viene.
