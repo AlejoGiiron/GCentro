@@ -20,5 +20,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "supabase/functions/_shared"],
+  "//": "El handler de la Edge Function (supabase/functions/sincronizar-bandera) queda AFUERA: usa globales de Deno que este tsconfig no conoce. `_shared` sí entra porque es TS puro y lo importa tanto Deno como el panel."
 }

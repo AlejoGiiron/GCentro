@@ -103,7 +103,7 @@ rollback;
 -- Reemplazá el UUID por el de tu usuario admin real (el que insertaste en
 -- `admins` desde el dashboard) y descomentá el bloque.
 --
--- Esperado, con las SIETE migraciones aplicadas:
+-- Esperado, con las OCHO migraciones aplicadas (002…008):
 --   admins                          1 o más
 --   productos                       3   (g-vento, g-mura, g-quota)
 --   terminos                        3   (mensual, semestral, anual — el

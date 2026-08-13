@@ -308,12 +308,35 @@ El nivel se **deriva** del estado comercial más los días respecto a `proximo_c
 | `activa` | faltan más de 7 días | `activa` |
 | `activa` | faltan 7 días o menos | `por_vencer` |
 | `gracia` | vencido 1–7 días | `gracia` |
-| `gracia` | vencido 8–15 días | `restringida` |
+| `gracia` | **vencido más de 7 días** | `restringida` |
 | `suspendida` | — | `suspendida` |
 | `cancelada` | — | `suspendida` |
 
 **En v1 el panel calcula el nivel sugerido y vos confirmás con un botón. Nada escala
 solo.** Son dos clientes y los conocés por el nombre. La automatización espera.
+
+Implementado en `src/lib/bandera.ts` como función pura —`hoy` entra por parámetro, igual
+que en `cobro.ts`—. Que la derivación no tenga ningún camino por el que escribir es lo que
+mantiene *verificable* la promesa de que nada escala solo.
+
+#### Dos huecos que la tabla tenía
+
+La versión anterior decía "vencido 8–15 días → `restringida`" y **no decía qué pasa el día
+16**. Tampoco qué pasa con una suscripción en `gracia` cuya fecha todavía no llegó.
+
+- **Vencido más de 15 días: se queda en `restringida`. No escala a `suspendida`.**
+  Suspender es una decisión **comercial**: se toma cambiando `suscripciones.estado`, no
+  dejando correr un contador. Si el día 16 la derivación empezara a sugerir `suspendida`
+  sola, "nada escala solo" sería falso en la práctica — la sugerencia es lo que se aprieta.
+  El único camino a `suspendida` pasa por una persona. Está fijado como propiedad en un
+  test: desde `activa` o `gracia`, ningún número de días produce `suspendida`.
+- **`gracia` con la fecha por delante → `gracia`.** Es un dato inconsistente: alguien puso
+  el estado a mano, o se movió `proximo_cobro` después. Manda el estado comercial, que es
+  lo que un humano escribió a propósito, y `gracia` es su piso — banner, sin bloquear nada.
+
+Y uno que la tabla sí cubría aunque no lo pareciera: **`activa` con la fecha ya pasada**
+cae en "faltan 7 días o menos" y sugiere `por_vencer`. Es lo correcto por §5: una
+suscripción que nadie movió a `gracia` no se restringe por aritmética.
 
 ### Cambio de plan a mitad de período
 
@@ -413,6 +436,28 @@ ambas Edge Functions y se rota como cualquier otra credencial.
 **El navegador nunca toca el secreto.** Por eso el salto por la Edge Function de
 G-Centro y no una llamada directa desde el SPA.
 
+#### El contrato, ya implementado
+
+`POST` a `productos.url_aplicar_estado` (cargada en la migración `008`), cuerpo
+`{organization_id, status, message}`, headers `x-gcentro-timestamp` (epoch en **segundos**)
+y `x-gcentro-signature` (HMAC-SHA256 en hex). Ventana de **300s en ambas direcciones**.
+
+- **Se firma `${timestamp}.${cuerpo_crudo}`, sobre el body TAL CUAL viaja.** Por eso
+  `construirCuerpo` devuelve un `string` y no un objeto: si devolviera un objeto habría
+  dos serializaciones posibles —la que se firma y la que se manda— y basta con que
+  difieran en el orden de una clave para recibir un 401 intermitente e indiagnosticable.
+- **No se manda `Authorization` ni `apikey`.** `aplicar-estado` tiene verify-JWT
+  desactivado y su única autenticación es el HMAC; mandar un token de G-Centro hacia el
+  proyecto de G-Vento sería filtrar una credencial nuestra a los logs de otro sistema.
+- **Cada reintento se re-firma con su propio timestamp.** Reusar la firma haría que un
+  reintento tardío diera 401 y el diagnóstico apuntara al secreto.
+
+`sincronizar-bandera` **no usa service role**, ni de G-Centro ni de G-Vento: todo el
+acceso a la base va con el JWT de quien llamó, así que no puede hacer nada que ese admin
+no pudiera hacer solo desde el panel. El chequeo de "¿es admin?" es *pedirle una fila a
+`admins`*: bajo RLS eso solo funciona si lo es, así que la comprobación y la política de
+§8 son la misma cosa. Lo único que la función agrega al poder del que llama es firmar.
+
 ### El outbox
 
 Nunca asumir que la escritura funcionó. Primero se guarda la intención en
@@ -424,6 +469,30 @@ son "creí que había escrito y no".
 
 Esto es duplicación de estado deliberada. Es el precio de que el POS sobreviva a la
 caída de G-Centro.
+
+**`confirmado_en` solo se llena con un 200.** Es la columna que separa "yo lo decidí" de
+"el producto lo sabe". Un `changed:false` **también confirma**: significa que el producto
+ya estaba en ese estado, que es exactamente lo que la columna afirma. La idempotencia no
+es un fallo.
+
+#### Qué se reintenta y qué no
+
+Tres intentos, y **solo lo transitorio**: `TIMEOUT`, `RED`, `HTTP_5XX`.
+
+No se reintenta `HMAC_INVALIDO` —un secreto mal configurado o un reloj corrido no se
+arreglan en 1.5 segundos; serían tres 401 idénticos y treinta segundos de espera—, ni
+`HTTP_4XX` ni `ORG_NO_ENCONTRADA`, que son datos que el otro lado rechaza y va a seguir
+rechazando. Tampoco `DESCONOCIDO`: un error que no se pudo clasificar, reintentado tres
+veces, son tres errores que no se pudieron clasificar. La fila queda sin confirmar, que
+es justo la señal que el outbox existe para dar.
+
+#### Lo inválido no entra a la cola
+
+Un nivel desconocido, un mensaje de más de 280 caracteres o una suscripción sin
+`organizacion_externa_id` se rechazan **antes** de escribir la fila. No son intenciones
+pendientes: no hay nada que reintentar, y dejarlas en la cola la llena de trabajo que
+nunca va a completarse. El único caso que sí escribe fila y falla es el que llegó a la
+red — que es lo que el outbox modela.
 
 ### Fail-open, sin excepciones
 
@@ -462,17 +531,37 @@ Un mapeo de nombres esparcido en varios archivos es cómo se termina con dos tra
 que discrepan, y el síntoma aparece del otro lado —en la base de un cliente— donde no se
 puede depurar.
 
-> ⚠️ **PENDIENTE — los VALORES del enum no están confirmados.**
+#### Los cinco valores — CONFIRMADOS
+
+`subscription_status` es `text` con CHECK, **no un enum de Postgres**. Acepta exactamente
+estos cinco:
+
+| Nuestro nivel (§4) | `subscription_status` |
+|---|---|
+| `activa` | `active` |
+| `por_vencer` | `expiring` |
+| `gracia` | `grace` |
+| `restringida` | `restricted` |
+| `suspendida` | `suspended` |
+
+**El contrato es el inglés.** La correspondencia es uno a uno y la traducción vive en
+`supabase/functions/_shared/contrato.ts`, escrita como `Record<Nivel, EstadoProducto>`:
+si mañana se agrega un sexto nivel a §4, eso deja de compilar hasta que alguien decida su
+traducción. No hay forma de agregar un nivel y olvidarse del borde.
+
+> ⚠️ **Un valor desconocido se rechaza de NUESTRO lado, antes de la llamada.**
 >
-> Lo único que consta es que `subscription_status` tiene default `'active'`. Los otros
-> cuatro niveles de nuestra escalera (`por_vencer`, `gracia`, `restringida`,
-> `suspendida`) **no tienen traducción confirmada**, y la obvia puede no ser la real:
-> puede que su enum tenga menos valores, o distintos, o que acepte texto libre.
+> El otro lado responde 400 y lista los válidos, pero **no se depende de ese 400**. Con
+> fail-open (§5), un valor que ellos no reconozcan probablemente se lea como `activa`: una
+> suspensión se convertiría en silencio en "todo bien" —el sistema no fallaría, solo
+> dejaría de cobrar— y nadie se enteraría hasta notar que un moroso sigue operando normal.
 >
-> Mapear a ciegas y escribir un valor que su lado no entiende es peor que no escribir:
-> con fail-open (§5) un valor desconocido probablemente se lea como `activa`, o sea que
-> **una suspensión se convertiría en silencio en "todo bien"**. No se asume: se pregunta
-> antes de escribir el cliente.
+> Un error del que depende la corrección tiene que ser nuestro. Su 400 es la segunda red.
+>
+> Que sea un CHECK y no un enum tiene una consecuencia: la lista puede cambiar del otro
+> lado sin que ningún `ALTER TYPE` nos avise. Por eso los cinco valores están fijados en
+> un test que los compara contra la lista escrita a mano del contrato, no derivada del
+> código.
 
 ### Las tres columnas
 
@@ -486,7 +575,28 @@ cuándo corre la gracia: si cada reintento del outbox lo pisara, el contador se
 reiniciaría solo y nunca se sabría hace cuánto que un cliente está vencido.
 
 Si hiciera falta registrar cada llamada —para auditar reintentos— eso va en
-`banderas_pendientes`, de este lado, que ya existe y para eso está.
+`banderas_pendientes`, de este lado, que ya existe y para eso está. **No se guarda
+`subscription_updated_at` de vuelta:** los días de gracia se cuentan contra nuestro
+`proximo_cobro` (§4), que es el dato del contrato, no contra el reloj del otro sistema.
+
+#### El largo del mensaje lo pone G-Centro: 280 caracteres
+
+`subscription_message` es `text` sin límite y **G-Vento no lo valida**. Que no haya límite
+técnico no significa que cualquier largo sirva: el campo se renderiza en un banner encima
+de la pantalla de venta, en una tablet apaisada detrás de un mostrador.
+
+- Es el techo natural de **dos frases**. Más que eso ya no es un aviso de cobranza, es una
+  carta — y un banner persistente que nadie termina de leer deja de comunicar y pasa a ser
+  ruido que se aprende a ignorar. Justo cuando §6 dice que el mensaje es *la palanca real*.
+- Entra en dos o tres renglones sin empujar la venta hacia abajo. Un banner que tapa el
+  flujo de trabajo se vuelve un problema del cliente, no presión de cobranza.
+- **El límite tiene que existir de este lado porque del otro no existe.** Un `text` sin
+  límite escrito desde un panel es donde alguien termina pegando un hilo de correo entero,
+  y el que lo ve es el cajero del bar.
+
+Es un número de producto y se puede mover. Lo que no se puede es no tenerlo. Vive en
+`MENSAJE_MAX`, y `''` y `null` colapsan los dos a `null`: un string vacío del otro lado
+renderiza un banner en blanco, un rectángulo de color sin texto, que es peor que nada.
 
 **RLS:** legible por los miembros de la organización. Escribible por nadie. Solo la Edge
 Function `aplicar-estado`, con service role, puede tocarla. Los usuarios del cliente no
@@ -600,6 +710,18 @@ de subárbol** del diseño.
 
 **Regla operativa:** agregar una tabla o columna al esquema obliga a agregarla a la
 tabla del test de privacidad en el mismo commit.
+
+**Y también las claves que cruzan un límite.** El filtro no distingue de dónde viene una
+clave, así que el contrato con G-Vento (§6) entra a la misma tabla en su propio idioma:
+`organization_id` sobrevive por forma de UUID —igual que `organizacion_externa_id`, del
+que es el mismo dato— y `message` va filtrado en los dos idiomas, porque es prosa que un
+admin escribe sobre un cliente concreto. Un error de sincronización es justo el momento
+en que más tienta loguear el objeto entero.
+
+La firma HMAC y el secreto están además en la **deny-list**, que bajo allowlist es
+redundante. Se paga esa redundancia porque son lo único acá cuyo escape no sería un
+problema de privacidad sino de seguridad, y porque ataja el día que alguien agregue
+`x-gcentro-signature` al allowlist "para ver por qué da 401".
 
 ### Deuda aceptada: el módulo está duplicado
 
@@ -750,10 +872,26 @@ el nombre ya existe, y le están agregando un unique al nombre.
 **Se guarda SIEMPRE el UUID, nunca el nombre.** El nombre es texto editable: guardarlo
 convertiría un renombre cosmético del otro lado en una suscripción huérfana de este.
 
-### 9.5 Pendientes
+### 9.5 El contrato del puente — RESUELTA
 
-1. **Los VALORES del enum de `subscription_status`** (§6). Solo consta el default
-   `'active'`. Sin los otros cuatro confirmados no se puede escribir el cliente de la
-   Edge Function: con fail-open, mandar un valor que el producto no entienda convierte
-   una suspensión en "todo bien", y en silencio.
-2. **La URL de la Edge Function y el secreto HMAC**, para completar §5.
+Llegó completo: URL, los cinco valores de `subscription_status`, el esquema de firma y
+los códigos de respuesta. Documentado en §5 y §6, implementado en
+`supabase/functions/`, cargado en la migración `008`.
+
+El secreto HMAC va por variable de entorno de la Edge Function (`GVENTO_HMAC_SECRETO`),
+nunca en el repo ni en el bundle.
+
+### 9.6 Pendientes
+
+1. **El camino real del puente no se corrió.** Todo lo verificado es contra un doble de
+   `aplicar-estado` escrito desde el contrato en papel. Si el código de ellos hace algo
+   distinto de lo que el contrato dice, los tests no lo ven. Falta desplegar
+   `sincronizar-bandera`, cargar el secreto y ejercitar el circuito **contra LAB**.
+2. **El reintento en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
+   del panel. Una fila que queda sin `confirmado_en` porque G-Vento estaba caído no se
+   vuelve a intentar sola: alguien tiene que apretar de nuevo. Alcanza mientras sean dos
+   clientes y el panel muestre la cola sin confirmar; con más, hace falta un barrido
+   periódico. El índice parcial de `banderas_pendientes` ya está para eso.
+3. **La UI.** Nada de esto tiene pantalla todavía: el nivel se deriva y se envía, pero el
+   botón de confirmar, la cola de pendientes y el editor del mensaje del banner —que
+   según §6 es la palanca real de cobranza— son del bloque que viene.

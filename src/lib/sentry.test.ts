@@ -132,6 +132,30 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // de sync existe `bandera_error_codigo`, que es un enum derivado.
   { tabla: 'banderas_pendientes', columna: 'ultimo_error', ejemplo: 'HMAC invalido para org de Juan Perez' },
   { tabla: 'banderas_pendientes', columna: 'bandera_error_codigo', ejemplo: 'HMAC_INVALIDO', permitida: true },
+
+  // ── El puente hacia G-Vento (§5 y §6) ────────────────────────────────────
+  // No son columnas de NUESTRO esquema: son las claves que cruzan el límite,
+  // en el inglés del contrato. Van en la misma tabla porque el filtro no
+  // distingue de dónde viene una clave, y son justo las que aparecen en un
+  // error de sincronización — el momento en que más tienta loguear todo.
+  //
+  // El valor del banner va FILTRADO en los dos idiomas: es prosa que un admin
+  // escribe sobre un cliente concreto, la clase de campo donde ya se comprobó
+  // que cae un nombre propio.
+  { tabla: 'contrato', columna: 'message', ejemplo: 'Debe dos meses. Hablar con Ana antes del viernes.' },
+  { tabla: 'contrato', columna: 'mensaje', ejemplo: 'Debe dos meses. Hablar con Ana antes del viernes.' },
+  // La credencial. Bajo allowlist ya estaría filtrada por omisión; se fija
+  // igual porque es lo único acá cuyo escape no sería un problema de
+  // privacidad sino de seguridad.
+  { tabla: 'contrato', columna: 'x-gcentro-signature', ejemplo: 'a3f9c1e0b7d24856a3f9c1e0b7d24856a3f9c1e0b7d24856a3f9c1e0b7d24856' },
+  { tabla: 'contrato', columna: 'secreto', ejemplo: 'el-secreto-hmac-de-verdad' },
+  // El estado traducido: catálogo cerrado de cinco valores, igual que `estado`.
+  { tabla: 'contrato', columna: 'status', ejemplo: 'suspended', permitida: true },
+  // Derivación del panel (`src/lib/bandera.ts`). Cerrados los dos.
+  { tabla: 'bandera.ts', columna: 'nivel', ejemplo: 'restringida', permitida: true },
+  { tabla: 'bandera.ts', columna: 'regla', ejemplo: 'GRACIA_PROLONGADA', permitida: true },
+  // Idempotencia: `false` = el producto ya estaba así. Un booleano sin sujeto.
+  { tabla: 'contrato', columna: 'changed', ejemplo: false, permitida: true },
 ]
 
 const FILTRADAS = COLUMNAS_DEL_ESQUEMA.filter((c) => !c.permitida)
@@ -222,7 +246,12 @@ describe('scrubEstricto — el diagnóstico sobrevive', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe('scrubEstricto — los identificadores sobreviven', () => {
   const UUID = '3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
-  const IDS = ['id', 'cliente_id', 'suscripcion_id', 'producto_id', 'plan_id', 'organizacion_externa_id']
+  const IDS = [
+    'id', 'cliente_id', 'suscripcion_id', 'producto_id', 'plan_id', 'organizacion_externa_id',
+    // El puente: el mismo uuid con el nombre en inglés del contrato, y la fila
+    // del outbox por la que se sigue el hilo en el panel.
+    'organization_id', 'bandera_id',
+  ]
 
   for (const k of IDS) {
     it(`${k} pasa verbatim`, () => {
@@ -245,6 +274,44 @@ describe('scrubEstricto — los identificadores sobreviven', () => {
   it('un id es fail-closed POR FORMA: si no es UUID, se filtra', () => {
     const out = scrubEstricto({ cliente_id: 'Juan Perez' }) as Record<string, unknown>
     expect(out.cliente_id).toBe('[Filtrado:string(10)]')
+  })
+
+  it('un error del puente conserva TODO lo que sirve y nada de lo que no', () => {
+    // La forma real de un fallo de sincronización (§5). Es el momento en que
+    // más tienta loguear el objeto entero: la petición, la respuesta y el
+    // contexto. El filtro tiene que dejar el triage completo —quién, qué
+    // nivel, qué falló, cuántas veces— y perder la firma y el banner.
+    const out = scrubEstricto({
+      area: 'bandera',
+      bandera_id: UUID,
+      organization_id: '12b53bae-a4f7-4076-80f9-8f9288bd0567',
+      nivel: 'restringida',
+      status: 'restricted',
+      regla: 'GRACIA_PROLONGADA',
+      intentos: 3,
+      bandera_error_codigo: 'HMAC_INVALIDO',
+      changed: false,
+      message: 'Debe dos meses. Hablar con Ana antes del viernes.',
+      ultimo_error: 'HMAC invalido para la org de Juan Perez',
+      'x-gcentro-signature': 'a3f9c1e0b7d24856a3f9c1e0b7d24856a3f9c1e0b7d24856a3f9c1e0b7d24856',
+    }) as Record<string, unknown>
+
+    // Sobrevive el diagnóstico completo.
+    expect(out.area).toBe('bandera')
+    expect(out.bandera_id).toBe(UUID)
+    expect(out.organization_id).toBe('12b53bae-a4f7-4076-80f9-8f9288bd0567')
+    expect(out.nivel).toBe('restringida')
+    expect(out.status).toBe('restricted')
+    expect(out.regla).toBe('GRACIA_PROLONGADA')
+    expect(out.intentos).toBe(3)
+    expect(out.bandera_error_codigo).toBe('HMAC_INVALIDO')
+    expect(out.changed).toBe(false)
+
+    // Y no sale ni el banner, ni el texto crudo, ni la credencial.
+    const serializado = JSON.stringify(out)
+    expect(serializado).not.toContain('Ana')
+    expect(serializado).not.toContain('Juan Perez')
+    expect(serializado).not.toContain('a3f9c1e0')
   })
 
   it('las fechas ISO sobreviven en modo sobre', () => {

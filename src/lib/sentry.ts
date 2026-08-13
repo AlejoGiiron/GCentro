@@ -98,7 +98,7 @@ import * as Sentry from '@sentry/react'
  * Áreas funcionales — el tag que permite priorizar qué se rompe primero.
  * Se amplía a medida que el producto crece (suscripciones, pagos, bandera).
  */
-export type SentryArea = 'auth' | 'catalogo' | 'config'
+export type SentryArea = 'auth' | 'catalogo' | 'config' | 'bandera'
 
 const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
 
@@ -133,10 +133,16 @@ export const sentryEnabled =
  *     `init` o `unit`. Como STRING lo atraparía la pasada numérica, pero como
  *     NUMBER pasaría intacto — y no se confía en la forma del valor.
  *   · `referencia` es el número de la transacción bancaria del pago.
+ *   · `secret`, `signature`, `hmac` y `firma` son del puente de §5. Bajo
+ *     allowlist ya estarían filtradas por omisión; están igual porque un
+ *     chequeo fail-closed redundante sobre una CREDENCIAL cuesta nada, y el
+ *     día que alguien agregue una de esas claves al allowlist "para ver por
+ *     qué da 401", esto lo ataja. `firma` va anclada para no comerse
+ *     `confirmado_en`, que contiene la subcadena.
  * Las claves de G-Vento que acá no existen (`waiter`, `mozo`) se omiten.
  */
 const CLAVE_SENSIBLE =
-  /(nombre|name|razon|phone|telefono|tel|email|correo|address|direccion|customer|cliente|contacto|note|nota|reason|motivo|comment|coment|referencia|password|token|apikey|authorization|(^|_)nit(_|$))/i
+  /(nombre|name|razon|phone|telefono|tel|email|correo|address|direccion|customer|cliente|contacto|note|nota|reason|motivo|comment|coment|referencia|password|token|apikey|authorization|secret|signature|hmac|(^|_)firma(_|$)|(^|_)nit(_|$))/i
 
 /** Redacción de CONTENIDO, dentro de un string (un email en medio de una frase). */
 const REDACTADO = '[Filtrado]'
@@ -162,6 +168,12 @@ const REDACTADO = '[Filtrado]'
 const CLAVE_ID = new Set([
   'id', 'cliente_id', 'producto_id', 'plan_id', 'suscripcion_id',
   'organizacion_externa_id', 'user_id', 'userId',
+  // El puente (§5). `organization_id` es el MISMO uuid que
+  // `organizacion_externa_id`, con el nombre en inglés del contrato: es el
+  // único dato que identifica de quién es la bandera que falló, y sin él un
+  // error de sincronización dice "algo falló" y nada más. `bandera_id` es la
+  // fila del outbox, que es por donde se sigue el hilo en el panel.
+  'organization_id', 'bandera_id',
 ])
 
 const RE_UUID_EXACTO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -228,9 +240,20 @@ const CLAVE_PERMITIDA = new Set([
   // Conteos y tasas de catálogo cerrado.
   'meses', 'iva_pct', 'sedes_adicionales', 'intentos',
   'termino_descuento_pct',
-  // Reservado para el Bloque 2: el código derivado que reemplaza al texto
-  // crudo de `banderas_pendientes.ultimo_error`, que va filtrado.
+  // El código derivado que reemplaza al texto crudo de
+  // `banderas_pendientes.ultimo_error`, que va filtrado.
   'bandera_error_codigo',
+  // El puente (§5). Los tres son catálogos cerrados y ninguno describe a un
+  // cliente: `nivel` son los cinco de §4, `regla` son las seis derivaciones
+  // de `bandera.ts`, y `changed` es el booleano de idempotencia que responde
+  // "¿el producto ya estaba así?". Sin `regla`, un nivel sugerido que
+  // sorprende no se puede explicar sin rehacer la cuenta a mano.
+  //
+  // ⚠️ `mensaje` y `message` NO están, y no es un olvido: es el texto del
+  // banner, prosa que un admin escribe sobre un cliente concreto. Es
+  // exactamente la clase de campo donde ya se comprobó que cae un nombre
+  // propio. Se ve en el panel; a Sentry no va.
+  'nivel', 'regla', 'changed',
 ])
 
 // ── Redacción TIPADA ──────────────────────────────────────────────────────

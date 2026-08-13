@@ -57,9 +57,10 @@ copiar la lista de claves habría dejado `razon_social` y `nit` fugando.
 compilan y mienten — en G-Vento eso costó 129 errores de una sola vez cuando la
 base y los tipos se desincronizaron.
 
-**Deuda actual:** `src/types/database.types.ts` está escrito a mano porque el
-proyecto de Supabase todavía no existe. Regenerarlo apenas haya `supabase link`
-y borrar esta nota.
+**Deuda saldada.** El proyecto está linkeado y `src/types/database.types.ts`
+sale de `supabase gen types typescript --linked`. Cubre las nueve tablas y las
+dos vistas. **Después de cada migración aplicada, regenerarlo** — un tipo que
+quedó atrás de la base es la misma clase de mentira que uno escrito a mano.
 
 ### 4. No se reporta un bloque como completo sin correr el camino real
 
@@ -99,6 +100,10 @@ de privacidad (`src/lib/sentry.test.ts`), en el mismo commit.** Si no la
 agregás, el allowlist igual la redacta —ese es el punto de haberlo invertido—
 pero perdés la verificación, que es el único lugar donde queda escrito qué se
 consideró al diseñar el filtro.
+
+Lo mismo vale para **las claves que cruzan un límite**: el contrato con G-Vento
+va a esa tabla en su propio idioma (`organization_id`, `status`, `message`). El
+filtro no sabe de dónde viene una clave.
 
 ### 7. Convención Giiron (§2 del documento)
 
@@ -160,17 +165,22 @@ deriva de SU esquema. Está declarado en el encabezado del propio archivo.
 
 ## Estado
 
-**Bloque 1 (cimientos y seguridad): código completo, sin aplicar al dashboard.**
+**Bloques 1 y 2 cerrados. Bloque 3 (la bandera): código completo, sin desplegar.**
 
-Hecho: scaffold, catálogo (`productos`, `terminos`, `planes`) y `admins`,
-RLS deny-by-default vía `es_admin()`, auth email + TOTP obligatorio, Sentry,
-vitest.
+Hecho: scaffold; catálogo y `admins`; RLS deny-by-default vía `es_admin()`;
+auth email + TOTP obligatorio; Sentry con filtro allowlist; las cinco tablas de
+negocio; modelo de cobro y de cambio de plan (`src/lib/cobro.ts`); LAB y las
+vistas `*_cobrables`; el puente hacia G-Vento (`supabase/functions/`) con
+derivación del nivel, traducción, firma HMAC, outbox y reintentos.
 
-Pendiente de Alejandro: correr `schema-inicial.sql` y `verificar-rls.sql` en el
-dashboard, desactivar el registro público, crear el primer admin.
+Pendiente de Alejandro: aplicar `008`; regenerar los tipos; desplegar
+`sincronizar-bandera` con `GVENTO_HMAC_SECRETO`; **ejercitar el circuito contra
+LAB** (`f4fa692d-6cf3-43fb-a17f-18b8b163c918`), nunca contra G-10 ni Salchimelo.
 
-Sin cargar: los precios de `planes` (falta el número del contador; el modelo ya
-no bloquea — §9.1 resuelta: base gravable SIN IVA).
+⚠️ **El camino real del puente NO se corrió.** Todo lo verificado es contra un
+doble de `aplicar-estado` escrito desde el contrato en papel (regla 4).
 
-Fuera de alcance hasta nuevo aviso: clientes, suscripciones, pagos,
-`banderas_pendientes`, Edge Functions.
+Sin cargar: los precios de `planes` (falta el número del contador).
+
+Fuera de alcance hasta nuevo aviso: toda la UI. El panel no tiene pantallas
+todavía — la bandera se deriva y se envía, pero no hay botón.
