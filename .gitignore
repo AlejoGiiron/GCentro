@@ -13,3 +13,7 @@ Thumbs.db
 
 .vscode/*
 !.vscode/extensions.json
+
+# Estado local del CLI de Supabase (ref del proyecto, versiones, pooler url).
+# Es de la máquina, no del repo.
+supabase/.temp/
