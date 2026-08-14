@@ -21,7 +21,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
 import { mensualEfectivo } from '@/lib/cobro'
-import { nivelSugerido, type Nivel, type Sugerencia } from '@/lib/bandera'
+import { nivelSugerido } from '@/lib/bandera'
 import { hoyISO } from '@/lib/formato'
 import {
   banderaSchema,
@@ -29,6 +29,7 @@ import {
   type Bandera,
   type SuscripcionLista,
 } from './schemas'
+import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
@@ -39,43 +40,6 @@ const SELECT = `
   planes!inner ( codigo, nombre ),
   terminos!inner ( codigo, meses )
 `
-
-/**
- * Lo que el PRODUCTO sabe. Deliberadamente separado del estado comercial.
- *
- * §5: la mayoría de los bugs feos de sistemas cruzados son "creí que había
- * escrito y no". Fusionar esto con `suscripciones.estado` en un solo
- * indicador es precisamente cómo se pierde esa distinción.
- */
-export interface EstadoBandera {
-  /**
-   * · `sin_puente`  → falta `organizacion_externa_id` o `url_aplicar_estado`.
-   *                   NUNCA va a poder confirmarse; no es transitorio.
-   * · `nunca`       → nunca se sincronizó. El producto está en su default.
-   * · `confirmada`  → hay un 200 registrado.
-   */
-  clase: 'sin_puente' | 'nunca' | 'confirmada'
-  /** El último nivel que el producto confirmó. */
-  nivel?: Nivel
-  /** Cuándo lo confirmó. */
-  desde?: string
-  /** `false` = ya estaba así. `undefined` = fila anterior a la migración 009. */
-  cambioEfectivo?: boolean | null
-  /** Filas posteriores que quedaron sin confirmar. Independiente de lo de arriba. */
-  sinConfirmar: number
-  /** Código de la más reciente sin confirmar, para saber por dónde falló. */
-  ultimoCodigo?: string | null
-}
-
-export interface FilaLista {
-  suscripcion: SuscripcionLista
-  /** Total que se cobra por ciclo: mensual efectivo × meses del término. */
-  montoCiclo: number
-  mensual: number
-  /** §4. SUGIERE; no se aplica solo. */
-  sugerencia: Sugerencia
-  bandera: EstadoBandera
-}
 
 function derivarBandera(s: SuscripcionLista, propias: Bandera[]): EstadoBandera {
   if (!s.organizacion_externa_id || !s.productos.url_aplicar_estado) {
@@ -141,16 +105,19 @@ export function useSuscripciones(mostrarPrueba: boolean) {
             termino_meses: s.terminos.meses,
           }
           const mensual = mensualEfectivo(tarifa)
+          const sugerencia = nivelSugerido(s.estado, s.proximo_cobro, hoy)
+          const bandera = derivarBandera(
+            s,
+            todasLasBanderas.filter((b) => b.suscripcion_id === s.id),
+          )
 
           return {
             suscripcion: s,
             mensual,
             montoCiclo: mensual * s.terminos.meses,
-            sugerencia: nivelSugerido(s.estado, s.proximo_cobro, hoy),
-            bandera: derivarBandera(
-              s,
-              todasLasBanderas.filter((b) => b.suscripcion_id === s.id),
-            ),
+            sugerencia,
+            bandera,
+            atencion: clasificar(sugerencia.nivel, bandera),
           }
         })
         .sort((a, b) =>
