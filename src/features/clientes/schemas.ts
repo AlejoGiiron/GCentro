@@ -58,6 +58,15 @@ export const banderaSchema = z.object({
   cambio_efectivo: z.boolean().nullable(),
   confirmado_en: z.string().nullable(),
   creado_en: z.string(),
+  // ⚠️ Declarado aunque la pantalla 1 todavía no lo muestre. Zod DESCARTA en
+  // silencio lo que no está en el schema, y comprobado contra el payload vivo
+  // (14/08) esta clave se estaba perdiendo: la migración 010 existe justamente
+  // para que "¿quién hizo esto?" tenga respuesta, y un schema que la tira la
+  // deja sin respuesta en la UI sin que nadie se entere. La cola (pantalla 3)
+  // la necesita.
+  //
+  // NULL = fila anterior a 010, o escrita desde el SQL Editor.
+  admin_id: z.string().uuid().nullable(),
 })
 
 export type Bandera = z.infer<typeof banderaSchema>
