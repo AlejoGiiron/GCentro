@@ -35,6 +35,7 @@ export type Database = {
       banderas_pendientes: {
         Row: {
           bandera_error_codigo: string | null
+          cambio_efectivo: boolean | null
           confirmado_en: string | null
           creado_en: string
           id: string
@@ -45,6 +46,7 @@ export type Database = {
         }
         Insert: {
           bandera_error_codigo?: string | null
+          cambio_efectivo?: boolean | null
           confirmado_en?: string | null
           creado_en?: string
           id?: string
@@ -55,6 +57,7 @@ export type Database = {
         }
         Update: {
           bandera_error_codigo?: string | null
+          cambio_efectivo?: boolean | null
           confirmado_en?: string | null
           creado_en?: string
           id?: string

@@ -73,6 +73,17 @@ policy deniega, o si el trigger dispara.
 - Si no se pudo ejecutar el camino real, **el reporte lo dice explícitamente**
   y nombra qué quedó sin verificar. No se redacta como si estuviera probado.
 
+**Testear la unidad equivocada es indistinguible de no testear.** Pasó el
+14/08/2026: el documento afirmaba que ninguna entrada inválida escribe en
+`banderas_pendientes`, había 416 tests, y era falso. `enviar.test.ts` probaba
+que `enviarBandera` falla antes de tocar la red —cierto e irrelevante: el
+insert estaba en el handler—. Una afirmación sobre el ORDEN de dos operaciones
+solo se puede probar donde ocurren las dos.
+
+Corolario: **lo que no se puede correr en un test no lleva decisiones adentro.**
+`supabase/functions/*/index.ts` son adaptadores de Deno; la lógica va en
+`_shared/`, que corre en vitest.
+
 ### 5. Antes de decir "esto viene heredado de otro repo", verificarlo ahí
 
 Afirmar que un bug, un patrón o una decisión viene de G-Vento (o de G-Quota, o

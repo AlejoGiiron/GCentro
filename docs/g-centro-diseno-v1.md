@@ -287,6 +287,14 @@ que ahí termina cayendo un nombre propio. Para diagnóstico externo va
 `HTTP_5XX` · `ORG_NO_ENCONTRADA` · `RED` · `DESCONOCIDO`) que responde la única pregunta
 que importa cuando falla la sincronización: ¿es el secreto, la red, o el otro lado?
 
+**El enum no tiene categoría para "dato inválido de este lado", y no la necesita.** Se
+diseñó para fallas de SINCRONIZACIÓN, y una entrada inválida ya no llega al insert (§5):
+si no hay fila, no hay código que ponerle. Durante un tiempo esa categoría sí ocurría y se
+guardaba como `DESCONOCIDO`, que mentía — no era un error sin clasificar, era una
+validación nuestra corriendo tarde. Agregar un valor al enum habría sido tratar el
+síntoma. Hoy `DESCONOCIDO` es literal: no sabemos qué pasó, porque no debería estar
+pasando.
+
 ### admins
 
 `id` `uuid` pk (= `auth.users.id`, `on delete cascade`) · `email` · `creado_en`
@@ -517,11 +525,46 @@ es justo la señal que el outbox existe para dar.
 
 #### Lo inválido no entra a la cola
 
-Un nivel desconocido, un mensaje de más de 280 caracteres o una suscripción sin
-`organizacion_externa_id` se rechazan **antes** de escribir la fila. No son intenciones
-pendientes: no hay nada que reintentar, y dejarlas en la cola la llena de trabajo que
-nunca va a completarse. El único caso que sí escribe fila y falla es el que llegó a la
-red — que es lo que el outbox modela.
+**Una fila en la cola significa "esto hay que aplicarlo y se va a reintentar hasta
+lograrlo".** Un dato inválido no es eso: no se arregla reintentando. Por eso todo lo que
+pueda rechazarse mirando la entrada se rechaza **antes** del insert — nivel desconocido,
+mensaje de más de 280 caracteres o del tipo equivocado, `suscripcion_id` que no es UUID,
+suscripción sin `organizacion_externa_id`, producto sin puente, secreto sin configurar.
+
+El único caso que escribe fila y falla es el que **llegó a la red**, que es exactamente lo
+que el outbox modela.
+
+Esto no es higiene: `confirmado_en is null` tiene que poder leerse como "falta aplicar".
+Cuando exista el barrido en diferido (§9.7), una fila imposible de completar se
+reintentaría para siempre.
+
+> ### ⚠️ Cómo se descubrió que esto era falso
+>
+> Este párrafo estuvo escrito acá desde el 12/08 y **el código no lo cumplía**. La
+> validación del largo del mensaje vivía dentro de `construirCuerpo`, o sea *después* del
+> insert: un mensaje de 281 caracteres devolvía 400 y dejaba una fila muerta en la cola,
+> con `bandera_error_codigo = 'DESCONOCIDO'` —que además mentía— y `confirmado_en` en null.
+> Lo encontró una prueba en vivo el 14/08/2026, no un test.
+>
+> **Había 416 tests y ninguno lo veía.** `enviar.test.ts` probaba que `enviarBandera` tira
+> antes de tocar la red, lo cual era cierto y era irrelevante: **el insert no estaba en
+> `enviarBandera`, estaba en el handler** — y el handler no tenía tests, porque vivía en
+> `index.ts` junto a los globales de Deno y no se podía correr en vitest.
+>
+> Las tres lecciones, en orden de importancia:
+>
+> 1. **Testear la unidad equivocada es indistinguible de no testear.** Una afirmación
+>    sobre el ORDEN de dos operaciones solo se puede probar donde las dos ocurren.
+> 2. **Lo que no se puede correr en un test no lleva decisiones adentro.** `index.ts` es
+>    ahora un adaptador de Deno y nada más; la orquestación vive en
+>    `_shared/sincronizar.ts`, que sí corre en vitest.
+> 3. **Una propiedad escrita en el documento no es una propiedad verificada.** El párrafo
+>    sonaba a descripción y era una intención.
+>
+> La auditoría posterior encontró otras dos del mismo lado equivocado de la línea, las dos
+> inalcanzables hoy pero por accidente: el chequeo de `organizacion_externa_id` era "tiene
+> algo" mientras el contrato exige forma de UUID, y un secreto sin configurar fallaba
+> dentro de `enviarBandera`. Las tres están fijadas en `sincronizar.test.ts`.
 
 ### Fail-open, sin excepciones
 
