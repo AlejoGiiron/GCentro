@@ -76,7 +76,7 @@ Rama `develop`. Conventional Commits. Commits atómicos.
 
 ## 3. Modelo de datos
 
-Tres capas separadas: el **catálogo** (qué vendés), el **contrato** (qué acordaste con
+Tres capas separadas: el **catálogo** (qué se vende), el **contrato** (qué se acordó con
 cada cliente), y los **hechos** (qué pasó). Mezclarlas es lo que después obliga a
 rehacer el esquema.
 
@@ -130,7 +130,7 @@ entero, esquivando toda la política de §8.
 `precio_mensual` `integer` · `precio_sede_adicional` `integer` · `incluye_dian`
 `boolean` · `vigente_desde` `date` · `activo` `boolean`
 
-Precio de **lista**, no de contrato. Cuando subas precios, las suscripciones vigentes
+Precio de **lista**, no de contrato. Cuando suban los precios, las suscripciones vigentes
 no deben cambiar solas.
 
 `precio_mensual` y `precio_sede_adicional` son **base gravable, SIN IVA** (ver §9.1).
@@ -221,8 +221,8 @@ la organización exista del otro lado.
 
 **Un precio especial es un acuerdo, no un descuento por término.** G-10 y Salchimelo
 pagan 75.000 donde la lista dice 80.000: eso se carga como `precio_base_mensual = 75.000`
-con `descuento_pct = 0`, y **no** como un 6,25% de descuento sobre 80.000. Si mañana
-renegociás, el número no queda confundido con la escalera de términos — que es la que
+con `descuento_pct = 0`, y **no** como un 6,25% de descuento sobre 80.000. Si mañana se
+renegocia, el número no queda confundido con la escalera de términos — que es la que
 sube automáticamente si el cliente pasa a semestral o anual. Mezclarlos daría un
 descuento encima de otro que nadie pactó.
 
@@ -282,8 +282,8 @@ El par `cubre_desde` / `cubre_hasta` es lo que hace que el histórico sirva:
 mano y se desincroniza.
 
 **Sin tabla de facturas ni de cargos en v1.** Se registra plata que entró; la obligación
-se calcula. Cuando entre la pasarela va a hacer falta el ledger, pero para ese día ya
-sabés cómo se comporta el modelo.
+se calcula. Cuando entre la pasarela va a hacer falta el ledger, pero para ese día el
+comportamiento del modelo ya va a estar entendido.
 
 ### banderas_pendientes
 
@@ -490,7 +490,8 @@ diferencia". Con el upgrade funcionaba; con el downgrade abría un agujero:
 > que no se cobra nada. Y el período se reinicia: **doce meses de Esencial gratis.**
 
 Cualquier cliente anual podía renovar sin pagar bajando de plan cerca del vencimiento.
-Con dos clientes que conocés por el nombre no iba a pasar; con veinte, sí.
+Con dos clientes conocidos uno por uno no iba a pasar; con cincuenta, sí — y a esa escala
+nadie lo nota mirando.
 
 Convertir el saldo lo cierra por construcción: el downgrade no regala tiempo, compra
 tiempo con plata que ya estaba paga. No hay nada que explotar porque no hay nada gratis.
@@ -836,7 +837,7 @@ privilegios que ya se cerró allá.
 abrir o cerrar un turno, y exportar.
 
 La facturación electrónica es una obligación legal del cliente. Meterse en el medio de
-eso lo convierte en tu problema legal.
+eso la convierte en un problema legal de Giiron.
 
 #### Por qué `suspendida` ya no bloquea la apertura de turnos
 
@@ -889,7 +890,8 @@ cliente" — que es como se escribe una cobranza de verdad.
 No en RLS, no en triggers.
 
 El bien protegido acá es la cobranza, no los datos. Un falso positivo en una política de
-base de datos es un bar que no puede vender mientras dormís. Un cliente moroso que abre
+base de datos es un bar que no puede vender a las tres de la mañana, sin nadie de
+Giiron despierto para destrabarlo. Un cliente moroso que abre
 devtools para desbloquear reportes se resuelve con una llamada. Los riesgos no son
 simétricos.
 
