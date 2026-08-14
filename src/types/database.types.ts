@@ -34,6 +34,7 @@ export type Database = {
       }
       banderas_pendientes: {
         Row: {
+          admin_id: string | null
           bandera_error_codigo: string | null
           cambio_efectivo: boolean | null
           confirmado_en: string | null
@@ -45,6 +46,7 @@ export type Database = {
           valor_deseado: string
         }
         Insert: {
+          admin_id?: string | null
           bandera_error_codigo?: string | null
           cambio_efectivo?: boolean | null
           confirmado_en?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           valor_deseado: string
         }
         Update: {
+          admin_id?: string | null
           bandera_error_codigo?: string | null
           cambio_efectivo?: boolean | null
           confirmado_en?: string | null
@@ -67,6 +70,13 @@ export type Database = {
           valor_deseado?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "banderas_pendientes_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "banderas_pendientes_suscripcion_id_fkey"
             columns: ["suscripcion_id"]
@@ -124,6 +134,7 @@ export type Database = {
       }
       pagos: {
         Row: {
+          admin_id: string | null
           cliente_id: string
           concepto: string
           cubre_desde: string | null
@@ -140,6 +151,7 @@ export type Database = {
           suscripcion_id: string | null
         }
         Insert: {
+          admin_id?: string | null
           cliente_id: string
           concepto: string
           cubre_desde?: string | null
@@ -156,6 +168,7 @@ export type Database = {
           suscripcion_id?: string | null
         }
         Update: {
+          admin_id?: string | null
           cliente_id?: string
           concepto?: string
           cubre_desde?: string | null
@@ -172,6 +185,13 @@ export type Database = {
           suscripcion_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pagos_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pagos_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -275,6 +295,7 @@ export type Database = {
       }
       suscripcion_eventos: {
         Row: {
+          admin_id: string | null
           creado_en: string
           datos: Json | null
           efectivo_desde: string | null
@@ -286,6 +307,7 @@ export type Database = {
           tipo: string
         }
         Insert: {
+          admin_id?: string | null
           creado_en?: string
           datos?: Json | null
           efectivo_desde?: string | null
@@ -297,6 +319,7 @@ export type Database = {
           tipo: string
         }
         Update: {
+          admin_id?: string | null
           creado_en?: string
           datos?: Json | null
           efectivo_desde?: string | null
@@ -308,6 +331,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "suscripcion_eventos_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "suscripcion_eventos_suscripcion_id_fkey"
             columns: ["suscripcion_id"]
@@ -543,6 +573,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_actual: { Args: never; Returns: string }
       es_admin: { Args: never; Returns: boolean }
     }
     Enums: {
