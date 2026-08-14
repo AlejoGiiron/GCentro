@@ -8,7 +8,7 @@ import { captureError, type SentryArea } from '@/lib/sentry'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { TotpEnrollPage } from '@/features/auth/TotpEnrollPage'
 import { TotpChallengePage } from '@/features/auth/TotpChallengePage'
-import { HomePlaceholder } from '@/features/home/HomePlaceholder'
+import { Panel } from '@/features/panel/Panel'
 
 function App() {
   const status = useAuthStore((s) => s.status)
@@ -52,7 +52,7 @@ function App() {
       {status === 'signed_out' && <LoginPage />}
       {status === 'needs_enroll' && <TotpEnrollPage />}
       {status === 'needs_challenge' && <TotpChallengePage />}
-      {status === 'ready' && <HomePlaceholder />}
+      {status === 'ready' && <Panel />}
     </QueryClientProvider>
   )
 }

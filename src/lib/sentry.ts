@@ -98,7 +98,7 @@ import * as Sentry from '@sentry/react'
  * Áreas funcionales — el tag que permite priorizar qué se rompe primero.
  * Se amplía a medida que el producto crece (suscripciones, pagos, bandera).
  */
-export type SentryArea = 'auth' | 'catalogo' | 'config' | 'bandera'
+export type SentryArea = 'auth' | 'catalogo' | 'config' | 'bandera' | 'clientes'
 
 const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
 
