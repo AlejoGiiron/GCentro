@@ -131,6 +131,13 @@ filtro no sabe de dónde viene una clave.
 - **UUID v4** para todos los identificadores.
 - Rama **`develop`**. Nunca commit directo a `main`.
 - **Conventional Commits**, commits atómicos.
+- **`git add` con rutas explícitas. Nunca `git add -A` ni `git add .`.**
+  Un `-A` barre lo que esté sin trackear y sin ignorar, que es un estado en el
+  que un repo vivo está todo el tiempo. Pasó el 14/08/2026: `.claude/` y
+  `.gemini/` —6.6 MB de skills de terceros— estuvieron a un `-A` de entrar a la
+  historia para siempre, y sacarlos después habría pedido reescribirla. Si el
+  commit tiene tantos archivos que listarlos molesta, probablemente sean dos
+  commits.
 
 ---
 

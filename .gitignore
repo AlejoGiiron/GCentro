@@ -17,3 +17,13 @@ Thumbs.db
 # Estado local del CLI de Supabase (ref del proyecto, versiones, pooler url).
 # Es de la máquina, no del repo.
 supabase/.temp/
+
+# Skills de terceros (Impeccable). Se instalan con npx y se actualizan solos:
+# versionar 147 archivos ajenos es deuda, no reproducibilidad. `.gemini/` es
+# además una copia del mismo skill con las rutas sustituidas — entre los dos
+# pesan 6.6 MB contra los 485 KB de código propio.
+#
+# ⚠️ Lo que SÍ va al repo es `.claude/settings.json`: eso es configuración del
+# proyecto, igual que CLAUDE.md.
+.claude/skills/
+.gemini/
