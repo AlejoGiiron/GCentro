@@ -234,23 +234,40 @@ por sede. Lo que se pierde es saber cuándo se agregó cada una; eso lo cubre
 ### suscripcion_eventos
 
 Bitácora. `id` · `suscripcion_id` fk · `tipo` · `estado_anterior` · `estado_nuevo` ·
-`datos` `jsonb` · `efectivo_desde` `date` · `motivo` `text` · `creado_en` `timestamptz`
+`datos` `jsonb` · `efectivo_desde` `date` · `motivo` `text` · `admin_id` fk nullable ·
+`creado_en` `timestamptz`
 
 Tipos: `CREADA` · `CAMBIO_PLAN` · `CAMBIO_TERMINO` · `SEDES_MODIFICADAS` ·
 `A_GRACIA` · `RESTRINGIDA` · `SUSPENDIDA` · `REACTIVADA` · `CANCELADA`
 
 **Esto no es event sourcing.** La fila de `suscripciones` es estado mutable; esta tabla
-es auditoría. Derivar el estado en cada lectura no compra nada en un panel de dos
-clientes y cuesta bastante.
+es auditoría. Derivar el estado en cada lectura no compra nada acá y cuesta bastante.
 
 `efectivo_desde` en el futuro representa un cambio agendado (ver §4).
+
+`RESTRINGIDA` **pertenece al otro vocabulario** y por eso el trigger nunca lo emite:
+`suscripciones.estado` tiene cuatro valores comerciales y `restringida` es un nivel de
+gating (§4). Hoy sólo puede escribirse a mano. Está anotado en §9.7.
+
+#### El cambio de estado lo escribe un TRIGGER, no la UI
+
+`suscripciones_cambio_de_estado` dispara `after update ... when (old.estado is distinct
+from new.estado)` e inserta el evento. Antes esto dependía de que la UI se acordara: o
+sea que no era una garantía, era una intención — la misma clase de error que el 14/08,
+una propiedad afirmada que el código no sostenía. Ahora da igual si el cambio vino del
+panel, del SQL Editor o de un script.
+
+**Lo que el trigger NO puede saber es el `motivo`.** Un trigger ve el antes y el después,
+nunca el por qué; queda en `NULL`. Capturarlo exige que el cambio pase por una función
+que lo reciba como parámetro. Está en §9.7. No se inventa un motivo genérico: parecería
+información y no lo sería.
 
 ### pagos
 
 `id` · `cliente_id` fk · `suscripcion_id` fk nullable · `concepto` · `monto` `integer` ·
 `monto_base` `integer` · `iva_pct` `smallint` · `fecha_pago` `date` · `metodo` `text` ·
 `referencia` `text` · `cubre_desde` `date` · `cubre_hasta` `date` · `nota` `text` ·
-`registrado_en` `timestamptz`
+`admin_id` fk nullable · `registrado_en` `timestamptz`
 
 Conceptos: `suscripcion` · `implementacion` · `ajuste` · `otro`
 
@@ -274,7 +291,7 @@ Cola de escritura hacia los productos. Ver §5.
 
 `id` · `suscripcion_id` fk · `valor_deseado` `text` · `intentos` `smallint` ·
 `ultimo_error` `text` · `bandera_error_codigo` `text` · `cambio_efectivo` `boolean`
-nullable · `confirmado_en` `timestamptz` nullable · `creado_en`
+nullable · `confirmado_en` `timestamptz` nullable · `admin_id` fk nullable · `creado_en`
 
 `cambio_efectivo` es el `changed` de la respuesta, guardado de este lado y en español
 porque es columna nuestra (§2). **El null significa algo:** `confirmado_en` lleno con
@@ -301,6 +318,42 @@ pasando.
 
 Allowlist. Toda política de RLS del proyecto se apoya en esta tabla, a través de la
 función `es_admin()` (ver §8).
+
+### El actor: `admin_id` en las tres tablas que registran una acción
+
+`suscripcion_eventos`, `pagos` y `banderas_pendientes` llevan `admin_id`, con
+`default public.admin_actual()` y FK a `admins`.
+
+Hasta el 14/08/2026 el panel se diseñó para **un** operador, y con uno solo "quién lo
+hizo" tenía respuesta trivial. La entrevista de producto cambió ese supuesto: el panel es
+donde Giiron centraliza los cobros y lo van a usar varias personas. Con varias, *"¿quién
+suspendió a este cliente?"* es la pregunta que aparece cuando un cliente llama enojado — y
+este panel escribe en la base de producción del cliente, así que **una acción sin autor es
+una acción sin responsable**.
+
+**`admin_actual()` y no `auth.uid()` pelado.** `auth.uid()` devuelve el uid del JWT exista
+o no en `admins`; con la FK puesta, un uid que no esté haría *fallar* el INSERT y rompería
+una emergencia desde el SQL Editor, que es justo el camino que tiene que seguir
+funcionando cuando algo ya se rompió. `admin_actual()` devuelve el uid sólo si es admin de
+verdad, y `NULL` en cualquier otro caso. El default nunca puede tumbar una escritura.
+
+**Nullable, y el `NULL` significa algo.** Tres orígenes: fila anterior a esta migración,
+escritura desde el SQL Editor sin sesión, o sesión cuyo uid no está en `admins`.
+
+> ⚠️ **El autor de todo lo anterior al 14/08/2026 no es recuperable.** Las filas ya
+> escritas quedan en `NULL` para siempre. No se rellenan: inventar un autor plausible es
+> peor que admitir que no se sabe, porque el histórico dejaría de poder distinguir lo
+> registrado de lo supuesto.
+
+**`on delete set null`, no `restrict`**, y es la parte incómoda: **borrar a un admin borra
+su autoría del histórico**. Se eligió igual porque revocar un acceso no puede quedar
+bloqueado por el registro de auditoría — en una emergencia se revoca primero y se discute
+después. La salida correcta es no borrar admins sino desactivarlos, y para eso falta una
+columna que hoy no existe. Anotado en §9.7.
+
+`admin_id` va **filtrado** en el reporte de errores: identifica a una persona. No se
+confunde con `Sentry.setUser({ id })` (§7), que manda el uuid de quien *reporta* el error;
+este es el de quien *firmó una acción*, posiblemente meses antes y desde otra sesión.
 
 ---
 
@@ -984,7 +1037,17 @@ suscripción sin `organizacion_externa_id`). Están probados contra el doble.
    vuelve a intentar sola: alguien tiene que apretar de nuevo. Alcanza mientras sean dos
    clientes y el panel muestre la cola sin confirmar; con más, hace falta un barrido
    periódico. El índice parcial de `banderas_pendientes` ya está para eso.
-2. **La UI.** Nada de esto tiene pantalla todavía: el nivel se deriva y se envía, pero el
-   botón de confirmar —con estado de carga, ver §5—, la cola de pendientes y el editor del
-   mensaje del banner —que según §6 es la palanca real de cobranza— son del bloque que
-   viene.
+2. **La UI.** El nivel se deriva y se envía, y la lista existe, pero el botón de confirmar
+   —con estado de carga, ver §5—, la cola de pendientes y el editor del mensaje del banner
+   —que según §6 es la palanca real de cobranza— siguen pendientes.
+3. **Desactivar admins en vez de borrarlos.** Hoy revocar un acceso es borrar la fila, y
+   con `on delete set null` eso borra la autoría de todo lo que esa persona hizo (§3).
+   Falta un `desactivado_en` en `admins` y que `es_admin()` lo exija en null. Toca la
+   función que sostiene toda la RLS, así que no se hizo de paso.
+4. **El `motivo` de un cambio de estado.** El trigger garantiza que el evento existe pero
+   no puede saber el porqué (§3). Capturarlo pide que el cambio pase por una función que
+   lo reciba —`cambiar_estado_suscripcion(id, estado, motivo)`— con el trigger quedando
+   como red de atrás para lo que se cambie por fuera.
+5. **`RESTRINGIDA` en el enum de `suscripcion_eventos`** pertenece al vocabulario de
+   gating, no al comercial, así que el trigger nunca lo emite. Decidir si se registra
+   cuando se aplica una bandera o si sale del enum.

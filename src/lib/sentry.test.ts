@@ -136,6 +136,22 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // del protocolo de sincronización: no dice nada de nadie.
   { tabla: 'banderas_pendientes', columna: 'cambio_efectivo', ejemplo: false, permitida: true },
 
+  // ── El actor (010) ───────────────────────────────────────────────────────
+  // Una sola fila para las TRES tablas: el filtro decide por clave, no por
+  // tabla, así que `suscripcion_eventos.admin_id`, `pagos.admin_id` y
+  // `banderas_pendientes.admin_id` son el mismo caso.
+  //
+  // FILTRADO: identifica a una PERSONA. Es la única clave del esquema que
+  // apunta a un empleado de Giiron y no a un cliente, y eso no la hace menos
+  // sensible — un reporte de errores que dice quién estaba operando es
+  // vigilancia laboral por accidente.
+  //
+  // ⚠️ No confundir con `Sentry.setUser({ id })`, que sí manda el uuid del
+  // admin que REPORTA el error (§7). Ese es quien tenía el navegador abierto;
+  // este es quien firmó una acción que puede haber ocurrido meses antes y
+  // desde otra sesión. Que uno viaje no autoriza al otro.
+  { tabla: 'suscripcion_eventos · pagos · banderas_pendientes', columna: 'admin_id', ejemplo: '134f1e09-fe39-45f0-81aa-8d006d9b8369' },
+
   // ── El puente hacia G-Vento (§5 y §6) ────────────────────────────────────
   // No son columnas de NUESTRO esquema: son las claves que cruzan el límite,
   // en el inglés del contrato. Van en la misma tabla porque el filtro no
