@@ -378,8 +378,62 @@ El nivel se **deriva** del estado comercial más los días respecto a `proximo_c
 | `suspendida` | — | `suspendida` |
 | `cancelada` | — | `suspendida` |
 
-**En v1 el panel calcula el nivel sugerido y vos confirmás con un botón. Nada escala
-solo.** Son dos clientes y los conocés por el nombre. La automatización espera.
+**El panel calcula el nivel sugerido y una persona confirma. Nada escala solo.**
+
+### Por qué nada escala solo
+
+> La versión anterior de esta sección lo justificaba con *"son dos clientes y los conocés
+> por el nombre"*. Ese argumento **está muerto**: el objetivo confirmado es 50 o más, y
+> revisar 50 a mano todos los días no es "la automatización espera", es trabajo repetitivo
+> que se termina haciendo mal. La conclusión sobrevive; el argumento es otro.
+
+**El argumento es la asimetría de consecuencias, y no depende del tamaño:**
+
+| Error | Quién lo paga |
+|---|---|
+| Restringir a quien pagó | Un bar con un banner de cobranza en la pantalla de venta, delante de sus clientes |
+| No restringir a quien debe | Giiron, un día de una suscripción |
+
+Nunca van a ser simétricos. Y con más clientes la asimetría **empeora**, no mejora: los
+pagos llegan por transferencia y se registran a mano, así que `pagos` va detrás de la
+realidad por horas o días. **Una automatización actuaría sobre lo registrado, no sobre lo
+que pasó**, y ese hueco es exactamente donde viven los falsos positivos. Más clientes son
+más transferencias en tránsito.
+
+#### La invariante, y el mecanismo que la sostiene a escala
+
+Lo que hay que preservar no es "un botón por cliente" —eso no escala— sino:
+
+> **Ningún estado llega al producto de un cliente sin que una persona lo haya visto.**
+
+Eso se cumple igual revisando y aprobando **una tanda**. El mecanismo cambia; la
+invariante no.
+
+#### Dónde está la línea: donde algo empieza a bloquear
+
+| Nivel | Qué bloquea |
+|---|---|
+| `activa` · `por_vencer` · `gracia` | **Nada.** Aviso o banner |
+| `restringida` · `suspendida` | Módulos administrativos |
+
+Hasta `gracia` inclusive, la escalada puede automatizarse. De `restringida` para arriba,
+nunca.
+
+⚠️ **El criterio NO es que `gracia` sea inocuo.** `gracia` pone un banner persistente en
+la pantalla de venta: el cliente **lo ve**, y eso es visible y molesto a propósito. El
+criterio es que **es reversible y no impide operar**: si se aplicó por error, se quita y no
+quedó nada roto — no hubo una venta que no se pudo cobrar ni un turno que no se pudo
+abrir.
+
+Esa distinción importa porque "es casi inocuo" es exactamente la frase que alguien cita
+dentro de un año para automatizar un escalón más arriba. `restringida` no es un poco más
+molesto que `gracia`: es la primera vez que el cliente **pierde una capacidad**.
+
+#### Desescalar es automático e inmediato, siempre
+
+La regla anterior vale para **subir**. Bajar no se aprueba: un cliente que pagó no puede
+esperar a que alguien confirme su vuelta a `activa`. Es la misma asimetría leída al revés,
+y es lo que §5 llama fail-open.
 
 Implementado en `src/lib/bandera.ts` como función pura —`hoy` entra por parámetro, igual
 que en `cobro.ts`—. Que la derivación no tenga ningún camino por el que escribir es lo que
@@ -565,7 +619,7 @@ Con 10s de timeout por intento sobra margen, así que no es un problema de corre
 primer clic. Dos segundos sin respuesta es exactamente el intervalo en el que alguien
 aprieta de nuevo — y acá apretar de nuevo escribe otra fila en la cola.
 
-#### Qué se reintenta y qué no
+#### Qué se reintenta y qué no, dentro de la llamada
 
 Tres intentos, y **solo lo transitorio**: `TIMEOUT`, `RED`, `HTTP_5XX`.
 
@@ -575,6 +629,35 @@ arreglan en 1.5 segundos; serían tres 401 idénticos y treinta segundos de espe
 rechazando. Tampoco `DESCONOCIDO`: un error que no se pudo clasificar, reintentado tres
 veces, son tres errores que no se pudieron clasificar. La fila queda sin confirmar, que
 es justo la señal que el outbox existe para dar.
+
+#### El reintento en diferido: obligatorio en una dirección, opcional en la otra
+
+> La versión anterior decía que el reintento manual alcanzaba *"mientras sean dos clientes
+> y el panel muestre la cola sin confirmar"*. **Esa conclusión era incorrecta**, y no solo
+> por la escala: le faltaba mirar la dirección del cambio.
+
+**Fail-open protege subiendo, no bajando.** Es la mitad de la garantía que se suele leer
+como si fuera entera:
+
+- **Bandera de escalada que falla** (queríamos `gracia`, quedó `activa`). El cliente
+  sigue operando normal. Cuesta cobranza demorada, no daño. **Fail-open cubre este caso.**
+- **Bandera de desescalada que falla** (el cliente pagó, queríamos `activa`, quedó
+  `restringida`). **Un cliente al día sigue con el banner puesto y con los módulos
+  bloqueados.** Fail-open no cubre nada acá: el estado viejo ya está escrito del otro lado
+  y no expira solo — por diseño, porque §5 prohíbe los vencimientos automáticos.
+
+El segundo caso es **daño real y silencioso**: real porque el cliente cumplió y lo está
+pagando igual, y silencioso porque de este lado todo se ve bien salvo una fila sin
+confirmar en una cola que nadie está obligado a mirar. Con dos clientes se nota en una
+hora. Con cincuenta no se nota.
+
+> **La regla: el reintento automático es OBLIGATORIO cuando la bandera pendiente es MENOS
+> restrictiva que lo aplicado.** En esa dirección deja de ser una optimización y pasa a ser
+> corrección. En la dirección contraria puede seguir siendo manual.
+
+Es la misma asimetría de §4 —perjudicar a quien pagó pesa más que no cobrarle a quien
+debe— aplicada al transporte en vez de a la decisión. Que las dos secciones salgan del
+mismo principio no es casualidad: es la señal de que el principio es el correcto.
 
 #### Lo inválido no entra a la cola
 
@@ -789,6 +872,18 @@ Si en algún momento hace falta un escalón que muerda de verdad, se diseña con
 criterio de esta sección —qué deja de funcionar y a quién le llega el golpe— y no
 agregando un bloqueo porque la tabla tenga un renglón vacío.
 
+#### A escala, las plantillas del mensaje dejan de ser una comodidad
+
+Si el mensaje del banner es la palanca de cobranza, escribirlo a mano es el cuello de
+botella de la cobranza entera. Con dos clientes se redacta cada uno; **con cincuenta no se
+redacta ninguno**, y lo que pasa entonces no es que se escriban mensajes apurados: es que
+se deja de cambiar el nivel para no tener que escribirlo, y la palanca se apaga sola.
+
+Por eso las plantillas por nivel son **requisito, no adorno**, y por eso el editor tiene
+que dejar personalizar sobre la plantilla en vez de obligar a elegir entre plantilla y
+texto propio. El caso que hay que soportar es "la de siempre, más una frase para este
+cliente" — que es como se escribe una cobranza de verdad.
+
 ### Gating solo en la UI
 
 No en RLS, no en triggers.
@@ -924,9 +1019,20 @@ confirma que un admin real sí lee. Todo en transacciones con `rollback`.
 Corre `set local role` en cada prueba a propósito: el SQL Editor es `postgres`, dueño
 de las tablas, y no pasa por RLS — un `select` suelto ahí muestra todo y no prueba nada.
 
-Sumar esta base al ciclo de backup nocturno ya montado. Los datos son pocos pero
-irreemplazables: si se pierde el histórico de pagos, no hay forma de reconstruir quién
-debe qué.
+> ### ⚠️ PENDIENTE — el backup NO está montado
+>
+> Esto es una **acción sin hacer**, no una descripción de lo que hay. Estuvo redactado en
+> presente —"sumar esta base al ciclo de backup nocturno"— y se leía como si ya existiera;
+> un documento que describe una intención con la misma voz que un hecho es exactamente lo
+> que lleva a descubrir el problema el día que hace falta el respaldo.
+>
+> **Falta: sumar esta base al ciclo de backup nocturno ya montado, y verificar una
+> restauración.** Un backup que nunca se restauró no se sabe si es un backup.
+>
+> El volumen no es el argumento: los datos son pocos y van a seguir siendo pocos aun con
+> cincuenta clientes. El argumento es que son **irreemplazables**. Si se pierde el
+> histórico de pagos no hay forma de reconstruir quién debe qué — no está en ningún otro
+> lado, ni siquiera en G-Vento, que no sabe nada de plata.
 
 ---
 
@@ -1032,11 +1138,12 @@ suscripción sin `organizacion_externa_id`). Están probados contra el doble.
 
 ### 9.7 Pendientes
 
-1. **El reintento en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
+1. **El barrido en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
    del panel. Una fila que queda sin `confirmado_en` porque G-Vento estaba caído no se
-   vuelve a intentar sola: alguien tiene que apretar de nuevo. Alcanza mientras sean dos
-   clientes y el panel muestre la cola sin confirmar; con más, hace falta un barrido
-   periódico. El índice parcial de `banderas_pendientes` ya está para eso.
+   vuelve a intentar sola. Según §5 eso **ya no es aceptable en la dirección de
+   desescalada**: una bandera menos restrictiva que lo aplicado tiene que reintentarse
+   sola, porque mientras no llegue hay un cliente al día pagando el banner. Falta el
+   barrido periódico; el índice parcial de `banderas_pendientes` ya está para eso.
 2. **La UI.** El nivel se deriva y se envía, y la lista existe, pero el botón de confirmar
    —con estado de carga, ver §5—, la cola de pendientes y el editor del mensaje del banner
    —que según §6 es la palanca real de cobranza— siguen pendientes.
