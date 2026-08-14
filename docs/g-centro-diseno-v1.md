@@ -3,17 +3,24 @@
 Panel de control de suscripciones. Producto nuevo, repo nuevo, proyecto de Supabase aparte.
 No comparte nada con G-Vento salvo una columna.
 
-Estado del documento: **Bloques 1 y 2 escritos; Bloque 3 empezado.** Catálogo, `admins`,
-RLS y auth (`schema-inicial.sql`, aplicado). Tablas de negocio, precios de lista, los dos
-clientes reales, el modelo de cobro, el monto de implementación y el tenant de pruebas
-(migraciones 002 a 007, **pendientes de aplicar**).
+Estado del documento, al **14/08/2026**: **Bloques 1, 2 y 3 cerrados. Bloque 4 (la UI)
+empezado.**
+
+Aplicado: catálogo, `admins`, RLS y auth (`schema-inicial.sql`); tablas de negocio,
+precios de lista, los dos clientes reales, el modelo de cobro, el monto de implementación
+y el tenant de pruebas (`002`–`007`); la URL del puente (`008`) y `cambio_efectivo`
+(`009`). Pendiente de aplicar: el actor y el trigger de cambio de estado (`010`).
+
+**El puente corrió en vivo contra LAB** los días 13 y 14/08: firma HMAC, idempotencia
+verificada con el mismo `subscription_updated_at` en dos llamadas idénticas, y los
+caminos de error 400 y 422 sin escribir en la cola.
 
 Resueltas: IVA (§9.1), cobro anticipado (§9.2), implementación exonerada (§9.3),
-`organizacion_externa_id` (§9.4).
+`organizacion_externa_id` (§9.4), el contrato del puente (§9.5), el camino real (§9.6).
 
-Falta: los **valores** del enum de `subscription_status` (§9.5) — sin eso no se puede
-escribir el cliente de la Edge Function—, la URL y el secreto HMAC, el resto de §5, y
-toda la UI.
+Falta: lo listado en §9.7 —barrido en diferido, desactivar admins en vez de borrarlos, el
+`motivo` de un cambio de estado, `RESTRINGIDA` en el enum de eventos—, el **backup**
+(§8, que no está montado), los precios de `planes` sin cargar, y las pantallas 2 a 4.
 
 ---
 
