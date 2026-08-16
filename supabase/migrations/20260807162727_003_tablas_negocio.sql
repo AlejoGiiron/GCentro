@@ -1,7 +1,7 @@
 -- G-Centro · Bloque 2 · Tablas de negocio
 --
--- MIGRACIÓN INCREMENTAL. No edita `schema-inicial.sql`, que ya está aplicado.
--- Se corre DESPUÉS de `002-terminos-corregidos.sql`: `suscripciones` tiene una
+-- MIGRACIÓN INCREMENTAL. No edita `20260805180823_schema_inicial.sql`, que ya está aplicado.
+-- Se corre DESPUÉS de `20260807162726_002_terminos_corregidos.sql`: `suscripciones` tiene una
 -- FK a `terminos` y el trimestral ya no debe existir cuando esto corra.
 --
 -- Crea las cinco tablas de §3 que faltaban: el contrato, su bitácora, los
@@ -191,7 +191,7 @@ create index on public.banderas_pendientes (suscripcion_id)
 -- ── RLS: deny by default, sin excepciones ────────────────────────────────
 -- Mismo patrón que el catálogo: todo contra `es_admin()`, la función
 -- `security definer` que evita la recursión de una policy sobre `admins`
--- (ver §8 y schema-inicial.sql). Sin fila en `admins`, ninguna de estas
+-- (ver §8 y 20260805180823_schema_inicial.sql). Sin fila en `admins`, ninguna de estas
 -- tablas devuelve nada.
 --
 -- Estas cinco son las que tienen la PII y la plata: son exactamente las que

@@ -1,6 +1,6 @@
 -- G-Centro · Bloque 2 · Seed de planes
 --
--- MIGRACIÓN INCREMENTAL. Cierra el TODO que dejó `schema-inicial.sql`: la
+-- MIGRACIÓN INCREMENTAL. Cierra el TODO que dejó `20260805180823_schema_inicial.sql`: la
 -- estructura de `planes` existía desde el Bloque 1, sin filas, esperando que
 -- se confirmaran los números.
 --

@@ -374,7 +374,6 @@ export type Database = {
           precio_base_mensual: number
           precio_sede_adicional: number
           producto_id: string
-          proximo_cobro: string
           sedes_adicionales: number
           termino: string
         }
@@ -394,7 +393,6 @@ export type Database = {
           precio_base_mensual: number
           precio_sede_adicional: number
           producto_id: string
-          proximo_cobro: string
           sedes_adicionales?: number
           termino: string
         }
@@ -414,7 +412,6 @@ export type Database = {
           precio_base_mensual?: number
           precio_sede_adicional?: number
           producto_id?: string
-          proximo_cobro?: string
           sedes_adicionales?: number
           termino?: string
         }
@@ -552,6 +549,7 @@ export type Database = {
         Row: {
           cubierto_hasta: string | null
           pagos_registrados: number | null
+          proximo_cobro: string | null
           suscripcion_id: string | null
           ultimo_pago: string | null
         }
@@ -589,7 +587,6 @@ export type Database = {
           precio_base_mensual: number | null
           precio_sede_adicional: number | null
           producto_id: string | null
-          proximo_cobro: string | null
           sedes_adicionales: number | null
           termino: string | null
         }

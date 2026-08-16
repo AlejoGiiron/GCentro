@@ -193,14 +193,25 @@ pnpm test:unit    # vitest run
 
 ## Migraciones
 
-Cada cambio de esquema va en un **archivo nuevo** dentro de `supabase/`.
-**Nunca editar una migración ya aplicada.**
+Viven en `supabase/migrations/`, con el formato del CLI:
+`<YYYYMMDDHHMMSS>_<NNN>_<nombre>.sql`.
 
-Excepción vigente: mientras nada esté aplicado al dashboard,
-`supabase/schema-inicial.sql` se sigue editando en su lugar.
+El número de tres dígitos se conserva **a propósito**: el documento y el
+código las referencian por número («ver `009`», «la 014») más de setenta
+veces. Sin él, cada una de esas referencias obligaría a buscar la fecha.
 
-`supabase/verificar-rls.sql` prueba que sin fila en `admins` no se lee nada.
-Correrlo después de cualquier cambio de policies.
+- Cada cambio de esquema va en un **archivo nuevo**.
+- **Nunca editar una migración ya aplicada.** Ya no hay excepción: la
+  inicial está aplicada desde el 05/08.
+- Después de aplicar, **regenerar los tipos** (regla 3).
+- Toda migración lleva su **bloque de verificación en transacción**. No es
+  ceremonia: el 16/08 la `013` falló al aplicarse y destapó que el motivo
+  se derramaba al siguiente cambio de la misma transacción.
+
+`supabase/verificar-rls.sql` **no es una migración** y por eso queda fuera
+de `migrations/`: es un script de verificación que se corre a mano después
+de cualquier cambio de policies, y prueba que sin fila en `admins` no se
+lee nada.
 
 ## Duplicación deliberada
 

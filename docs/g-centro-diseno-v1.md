@@ -6,7 +6,7 @@ No comparte nada con G-Vento salvo una columna.
 Estado del documento, al **14/08/2026**: **Bloques 1, 2 y 3 cerrados. Bloque 4 (la UI)
 empezado.**
 
-Aplicado: catálogo, `admins`, RLS y auth (`schema-inicial.sql`); tablas de negocio,
+Aplicado: catálogo, `admins`, RLS y auth (`20260805180823_schema_inicial.sql`); tablas de negocio,
 precios de lista, los dos clientes reales, el modelo de cobro, el monto de implementación
 y el tenant de pruebas (`002`–`007`); la URL del puente (`008`) y `cambio_efectivo`
 (`009`). Pendiente de aplicar: el actor y el trigger de cambio de estado (`010`).
@@ -175,7 +175,7 @@ coexistir.
 
 #### Precios de lista vigentes
 
-Base mensual, sin IVA. Cargados en `004-seed-planes.sql`.
+Base mensual, sin IVA. Cargados en `20260807162728_004_seed_planes.sql`.
 
 | Plan | Mensual | Sede adicional | DIAN |
 |---|---|---|---|
@@ -221,7 +221,7 @@ onboarding y videos. Si pide soporte de montaje, se cobra aparte y no es parte d
 
 Valores vigentes: mensual 0% · semestral 10% · anual 30%. Tabla y no enum, porque el
 descuento es dato y ya cambió una vez: el trimestral se eliminó y el anual pasó de 15%
-a 30% (`002-terminos-corregidos.sql`).
+a 30% (`20260807162726_002_terminos_corregidos.sql`).
 
 ### suscripciones
 

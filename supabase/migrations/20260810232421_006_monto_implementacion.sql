@@ -1,6 +1,6 @@
 -- G-Centro · Bloque 2 · Monto de la implementación
 --
--- MIGRACIÓN INCREMENTAL. No edita `003-tablas-negocio.sql`.
+-- MIGRACIÓN INCREMENTAL. No edita `20260807162727_003_tablas_negocio.sql`.
 --
 -- `estado_implementacion` ya guardaba SI se debe la implementación, pero no
 -- CUÁNTO. El día que un anual baje de término antes del año, el panel iba a

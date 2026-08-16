@@ -2,7 +2,7 @@
 --
 -- MIGRACIÓN INCREMENTAL. No edita nada anterior.
 --
--- `productos.url_aplicar_estado` existe desde `schema-inicial.sql` y quedó en
+-- `productos.url_aplicar_estado` existe desde `20260805180823_schema_inicial.sql` y quedó en
 -- NULL en los tres productos porque las Edge Functions no estaban desplegadas.
 -- Ya llegó la de G-Vento.
 --

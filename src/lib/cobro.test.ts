@@ -18,7 +18,7 @@ import {
  * calendario — que es donde estos modelos se rompen.
  */
 
-// ── Catálogo vigente (004-seed-planes.sql) ────────────────────────────────
+// ── Catálogo vigente (20260807162728_004_seed_planes.sql) ────────────────────────────────
 const ESENCIAL = { base: 80000, sede: 60000 }
 const PROFESIONAL = { base: 130000, sede: 90000 }
 const TERMINOS = { mensual: { meses: 1, desc: 0 }, semestral: { meses: 6, desc: 10 }, anual: { meses: 12, desc: 30 } }

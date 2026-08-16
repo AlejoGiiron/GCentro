@@ -28,7 +28,7 @@ import { scrubEstricto, scrubSobre, scrubEvento } from './sentry'
 //
 // Derivada de las migraciones de `supabase/` (schema-inicial + 002 a 005) y de
 // §3 del documento. Las cinco tablas de negocio YA EXISTEN: dejaron de estar
-// pendientes en 003-tablas-negocio.sql.
+// pendientes en 20260807162727_003_tablas_negocio.sql.
 // NO de `database.types.ts`, que está escrito a mano y no es fuente confiable
 // (regla 3 del CLAUDE.md).
 //
@@ -49,7 +49,7 @@ interface ColumnaEsquema {
 }
 
 const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
-  // ── productos (schema-inicial.sql) ──────────────────────────────────────
+  // ── productos (20260805180823_schema_inicial.sql) ──────────────────────────────────────
   { tabla: 'productos', columna: 'codigo', ejemplo: 'g-vento', permitida: true },
   { tabla: 'productos', columna: 'nombre', ejemplo: 'G-Vento' },
   // Hoy es infraestructura, pero si mañana la URL lleva un id en el path la
@@ -57,7 +57,7 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'productos', columna: 'url_aplicar_estado', ejemplo: 'https://x.supabase.co/functions/v1/aplicar-estado' },
   { tabla: 'productos', columna: 'activo', ejemplo: true, permitida: true },
 
-  // ── terminos (schema-inicial.sql) ───────────────────────────────────────
+  // ── terminos (20260805180823_schema_inicial.sql) ───────────────────────────────────────
   { tabla: 'terminos', columna: 'codigo', ejemplo: 'mensual', permitida: true },
   { tabla: 'terminos', columna: 'meses', ejemplo: 12, permitida: true },
   // ⚠️ `descuento_pct` PELADO va filtrado: la misma clave existe en
@@ -67,7 +67,7 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'terminos', columna: 'descuento_pct', ejemplo: 30 },
   { tabla: 'terminos', columna: 'termino_descuento_pct', ejemplo: 30, permitida: true },
 
-  // ── planes (schema-inicial.sql) ─────────────────────────────────────────
+  // ── planes (20260805180823_schema_inicial.sql) ─────────────────────────────────────────
   { tabla: 'planes', columna: 'codigo', ejemplo: 'esencial', permitida: true },
   { tabla: 'planes', columna: 'nombre', ejemplo: 'Plan Esencial' },
   { tabla: 'planes', columna: 'precio_mensual', ejemplo: 80000 },
@@ -75,10 +75,10 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'planes', columna: 'incluye_dian', ejemplo: true, permitida: true },
   { tabla: 'planes', columna: 'vigente_desde', ejemplo: '2026-01-01' },
 
-  // ── admins (schema-inicial.sql) ─────────────────────────────────────────
+  // ── admins (20260805180823_schema_inicial.sql) ─────────────────────────────────────────
   { tabla: 'admins', columna: 'email', ejemplo: 'admin@gcentro.co' },
 
-  // ── clientes (003-tablas-negocio.sql) ─────────────────────────────────────────────
+  // ── clientes (20260807162727_003_tablas_negocio.sql) ─────────────────────────────────────────────
   { tabla: 'clientes', columna: 'nombre_comercial', ejemplo: 'Bar G-10' },
   { tabla: 'clientes', columna: 'razon_social', ejemplo: 'G-10 SAS' },
   { tabla: 'clientes', columna: 'nit', ejemplo: 900123456 },
@@ -90,21 +90,21 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // sobre el cliente — y es el que responde "¿esto pasó en LAB o en producción?".
   { tabla: 'clientes', columna: 'es_prueba', ejemplo: true, permitida: true },
 
-  // ── suscripciones (003-tablas-negocio.sql) ────────────────────────────────────────
+  // ── suscripciones (20260807162727_003_tablas_negocio.sql) ────────────────────────────────────────
   { tabla: 'suscripciones', columna: 'termino', ejemplo: 'anual', permitida: true },
   { tabla: 'suscripciones', columna: 'estado', ejemplo: 'gracia', permitida: true },
   { tabla: 'suscripciones', columna: 'sedes_adicionales', ejemplo: 3, permitida: true },
   { tabla: 'suscripciones', columna: 'precio_base_mensual', ejemplo: 75000 },
   { tabla: 'suscripciones', columna: 'precio_sede_adicional', ejemplo: 60000 },
   { tabla: 'suscripciones', columna: 'descuento_pct', ejemplo: 30 },
-  // Cargo de única vez congelado (006-monto-implementacion.sql). Filtrado: es
+  // Cargo de única vez congelado (20260810232421_006_monto_implementacion.sql). Filtrado: es
   // plata del contrato de un cliente concreto, no un valor de catálogo.
   { tabla: 'suscripciones', columna: 'monto_implementacion', ejemplo: 250000 },
   { tabla: 'suscripciones', columna: 'estado_implementacion', ejemplo: 'exonerada', permitida: true },
   { tabla: 'suscripciones', columna: 'fecha_inicio', ejemplo: '2026-01-15' },
   { tabla: 'suscripciones', columna: 'proximo_cobro', ejemplo: '2026-09-01' },
 
-  // ── suscripcion_eventos (003-tablas-negocio.sql) ──────────────────────────────────
+  // ── suscripcion_eventos (20260807162727_003_tablas_negocio.sql) ──────────────────────────────────
   { tabla: 'suscripcion_eventos', columna: 'tipo', ejemplo: 'CAMBIO_PLAN', permitida: true },
   { tabla: 'suscripcion_eventos', columna: 'estado_anterior', ejemplo: 'activa', permitida: true },
   { tabla: 'suscripcion_eventos', columna: 'estado_nuevo', ejemplo: 'gracia', permitida: true },
@@ -113,7 +113,7 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // `jsonb` sin esquema fijo: se colapsa entero, no se allowlistean claves internas.
   { tabla: 'suscripcion_eventos', columna: 'datos', ejemplo: { quien: 'Juan Perez', precio_viejo: 79000 } },
 
-  // ── pagos (003-tablas-negocio.sql) ────────────────────────────────────────────────
+  // ── pagos (20260807162727_003_tablas_negocio.sql) ────────────────────────────────────────────────
   { tabla: 'pagos', columna: 'concepto', ejemplo: 'suscripcion', permitida: true },
   { tabla: 'pagos', columna: 'monto', ejemplo: 75000 },
   { tabla: 'pagos', columna: 'monto_base', ejemplo: 75000 },
@@ -125,7 +125,7 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   { tabla: 'pagos', columna: 'fecha_pago', ejemplo: '2026-08-05' },
   { tabla: 'pagos', columna: 'cubre_hasta', ejemplo: '2026-09-01' },
 
-  // ── banderas_pendientes (003-tablas-negocio.sql) ──────────────────────────────────
+  // ── banderas_pendientes (20260807162727_003_tablas_negocio.sql) ──────────────────────────────────
   { tabla: 'banderas_pendientes', columna: 'valor_deseado', ejemplo: 'restringida', permitida: true },
   { tabla: 'banderas_pendientes', columna: 'intentos', ejemplo: 3, permitida: true },
   // Texto libre: ya dejó salir un nombre propio en la auditoría. Para triage

@@ -1,6 +1,6 @@
 -- G-Centro · Bloque 2 · Corrección de términos
 --
--- MIGRACIÓN INCREMENTAL. `schema-inicial.sql` ya está aplicado en Supabase
+-- MIGRACIÓN INCREMENTAL. `20260805180823_schema_inicial.sql` ya está aplicado en Supabase
 -- Cloud y NO se edita — esta es la convención del repo (ver CLAUDE.md).
 --
 -- Cambia la oferta comercial: desaparece el trimestral y el anual pasa de 15%

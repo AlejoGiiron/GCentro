@@ -5,7 +5,7 @@
 -- el catálogo se puede recargar en cualquier ambiente, esto no. No correr en
 -- un proyecto de pruebas esperando datos de mentira.
 --
--- MIGRACIÓN INCREMENTAL. Se corre DESPUÉS de `004-seed-planes.sql`: las
+-- MIGRACIÓN INCREMENTAL. Se corre DESPUÉS de `20260807162728_004_seed_planes.sql`: las
 -- suscripciones apuntan al plan Esencial de g-vento.
 
 begin;
