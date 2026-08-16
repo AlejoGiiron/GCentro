@@ -1,4 +1,5 @@
 import { AlertTriangle, RotateCw } from 'lucide-react'
+import { SOPORTE } from '@/lib/soporte'
 
 interface ErrorFallbackProps {
   /** ID del evento en Sentry, para reportarlo por si hace falta. */
@@ -64,8 +65,15 @@ export function ErrorFallback({ eventId }: ErrorFallbackProps) {
           Algo falló en la aplicación
         </h1>
 
+        {/* ⚠️ EL TEXTO DEPENDE DE SI HUBO REPORTE, y no es un detalle.
+            Decir "ya se reportó al equipo" con la telemetría apagada es una
+            MENTIRA en la única pantalla que alguien lee cuando algo ya salió
+            mal — y encima le quita la razón para avisar. Sin `eventId` no
+            hubo reporte: se dice, y se dice qué hacer en su lugar. */}
         <p style={{ fontSize: 14, color: TINTA_MEDIA, lineHeight: 1.6, margin: '0 0 24px' }}>
-          El error ya se reportó al equipo. Recargá la página para seguir trabajando.
+          {eventId
+            ? 'El error ya se reportó al equipo. Recargá la página para seguir trabajando.'
+            : `Este error NO se reportó solo. ${SOPORTE.queHacer} Después recargá para seguir trabajando.`}
         </p>
 
         <button
