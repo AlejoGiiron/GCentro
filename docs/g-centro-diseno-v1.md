@@ -641,9 +641,29 @@ algo no cuadra entre los dos sistemas.
 
 La consecuencia es que la tabla crece con cada clic. Por eso existe `cambio_efectivo`
 (§3): sin ella, dos filas consecutivas con el mismo `valor_deseado` son indistinguibles
-salvo por la hora, y no hay forma de saber cuál movió algo del otro lado. Cuando la cola
-tenga pantalla, lo que se muestra por defecto es lo **no confirmado**; el historial
-completo es otra vista.
+salvo por la hora, y no hay forma de saber cuál movió algo del otro lado.
+
+**La pantalla de la cola tiene que enseñar esta propiedad, no sólo respetarla.** Quien la
+abre por primera vez ve filas repetidas y su primera hipótesis es que hay un bug. Por eso
+la pantalla 3 marca las repeticiones **como repeticiones en vez de esconderlas** —la fila
+se muestra entera, porque es un hecho que ocurrió, con una nota que explica por qué está—
+y por eso «Resultado» está en la tabla: es la columna que distingue el clic que movió algo
+del que no.
+
+Y por eso la cola se muestra **partida en dos**, que no es un filtro sino dos preguntas:
+
+| | Pregunta | Cómo se muestra |
+|---|---|---|
+| **Sin confirmar** | ¿qué falta aplicar? | completa, sin paginar — está acotada por diseño |
+| **Historial** | ¿qué pasó? | paginado |
+
+Que lo pendiente vaya sin paginar es deliberado: **si esa lista crece, eso ES la alarma**,
+y una paginación la escondería detrás de un «siguiente».
+
+**Reintentar no reintenta la fila: manda una bandera nueva.** La Edge Function siempre
+escribe su propia fila, así que un reintento deja otra entrada — coherente con que la cola
+cuente llamadas. La fila vieja no se toca: es el registro de que ese intento falló, y
+borrarla sería perder la única evidencia de que pasó.
 
 #### La primera llamada del día tarda ~2s
 

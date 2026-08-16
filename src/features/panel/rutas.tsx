@@ -18,6 +18,7 @@
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { ListaClientes } from '@/features/clientes/ListaClientes'
 import { useSuscripciones } from '@/features/clientes/useSuscripciones'
+import { ColaBanderas } from '@/features/cola/ColaBanderas'
 import { DetalleSuscripcion } from '@/features/suscripcion/DetalleSuscripcion'
 import { RUTAS } from '@/lib/rutas'
 import { SENAL } from '@/lib/tokens'
@@ -79,6 +80,7 @@ export function Rutas() {
     <Routes>
       <Route path={RUTAS.lista} element={<Lista />} />
       <Route path="/suscripcion/:id" element={<Detalle />} />
+      <Route path={RUTAS.cola} element={<ColaBanderas />} />
       {/* Cualquier otra cosa vuelve a la lista, sin dejar la ruta rota en el
           historial: `replace` evita que «atrás» reintente la ruta inválida. */}
       <Route path="*" element={<Navigate to={RUTAS.lista} replace />} />

@@ -5,4 +5,5 @@
 export const RUTAS = {
   lista: '/',
   suscripcion: (id: string) => `/suscripcion/${id}`,
+  cola: '/cola',
 } as const

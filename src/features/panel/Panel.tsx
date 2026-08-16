@@ -8,7 +8,8 @@ import { LogOut, ShieldAlert } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 import { FOCO } from '@/lib/tokens'
-import { HashRouter } from 'react-router-dom'
+import { HashRouter, NavLink } from 'react-router-dom'
+import { RUTAS } from '@/lib/rutas'
 import { Rutas } from './rutas'
 
 function Marco({ children }: { children: React.ReactNode }) {
@@ -16,12 +17,30 @@ function Marco({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-lienzo-base">
       <header className="border-b border-lienzo-borde bg-lienzo-panel">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-2.5">
-          <a
-            href="#/"
-            className={`rounded text-titulo tracking-tight text-tinta-fuerte ${FOCO}`}
-          >
-            G-Centro
-          </a>
+          <div className="flex items-baseline gap-5">
+            <span className="text-titulo tracking-tight text-tinta-fuerte">G-Centro</span>
+            <nav className="flex items-baseline gap-3">
+              {[
+                { a: RUTAS.lista, texto: 'Suscripciones' },
+                { a: RUTAS.cola, texto: 'Cola de banderas' },
+              ].map((r) => (
+                <NavLink
+                  key={r.a}
+                  to={r.a}
+                  end
+                  className={({ isActive }) =>
+                    `rounded px-1 py-0.5 text-micro ${FOCO} ${
+                      isActive
+                        ? 'font-medium text-tinta-fuerte'
+                        : 'text-tinta-media hover:text-tinta-fuerte'
+                    }`
+                  }
+                >
+                  {r.texto}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
           <button
             onClick={() => void supabase.auth.signOut()}
             className={`inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-micro text-tinta-media hover:text-tinta-fuerte ${FOCO}`}
