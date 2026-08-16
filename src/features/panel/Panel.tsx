@@ -8,7 +8,10 @@ import { LogOut, ShieldAlert } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 import { FOCO } from '@/lib/tokens'
+import { useState } from 'react'
 import { ListaClientes } from '@/features/clientes/ListaClientes'
+import { DetalleSuscripcion } from '@/features/suscripcion/DetalleSuscripcion'
+import { useSuscripciones } from '@/features/clientes/useSuscripciones'
 
 function Marco({ children }: { children: React.ReactNode }) {
   return (
@@ -59,9 +62,37 @@ export function Panel() {
     )
   }
 
+  return <Contenido />
+}
+
+/**
+ * Navegación entre las dos pantallas.
+ *
+ * ⚠️ Es estado local, NO una ruta: no hay router en el proyecto y agregarlo
+ * sería una dependencia para una pantalla. La consecuencia es real y está
+ * anotada — **no se puede compartir el enlace de un cliente**, y con varios
+ * operadores "mirá a G-10" va a querer ser un link. Cuando aparezca la tercera
+ * pantalla, entra el router.
+ */
+function Contenido() {
+  const [seleccion, setSeleccion] = useState<string | null>(null)
+  const { data } = useSuscripciones()
+  // La fila se relee de la consulta y no se guarda en el estado: así el
+  // detalle se actualiza solo cuando una acción invalida la lista, en vez de
+  // mostrar los datos congelados del momento en que se abrió.
+  const fila = data?.find((f) => f.suscripcion.id === seleccion)
+
+  if (seleccion && fila) {
+    return (
+      <Marco>
+        <DetalleSuscripcion fila={fila} volver={() => setSeleccion(null)} />
+      </Marco>
+    )
+  }
+
   return (
     <Marco>
-      <ListaClientes />
+      <ListaClientes abrir={(f) => setSeleccion(f.suscripcion.id)} />
     </Marco>
   )
 }

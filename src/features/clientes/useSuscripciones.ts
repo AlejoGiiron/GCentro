@@ -37,11 +37,13 @@ import { hoyISO } from '@/lib/formato'
 import {
   banderaSchema,
   suscripcionListaSchema,
+  coberturaSchema,
   ultimaConfirmadaSchema,
   type Bandera,
   type SuscripcionLista,
   type UltimaConfirmada,
 } from './schemas'
+import { SIN_COBERTURA, type Cobertura } from '@/lib/cobertura'
 import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
 /**
@@ -58,6 +60,8 @@ import { clasificar, type EstadoBandera, type FilaLista } from './vista'
  * Se saca en cuanto se corra `supabase gen types typescript --linked`.
  */
 const VISTA_ULTIMA_CONFIRMADA = 'bandera_ultima_confirmada' as 'clientes_cobrables'
+/** Ídem, migración 012 (marcador: TIPOS-011). */
+const VISTA_COBERTURA = 'suscripcion_cobertura' as 'clientes_cobrables'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
@@ -102,9 +106,10 @@ export function useSuscripciones() {
     // de datos. Alternarlo no vuelve a pedir nada.
     queryKey: ['suscripciones'],
     queryFn: async (): Promise<FilaLista[]> => {
-      const [suscripciones, confirmadas, pendientes] = await Promise.all([
+      const [suscripciones, confirmadas, coberturas, pendientes] = await Promise.all([
         supabase.from('suscripciones').select(SELECT),
         supabase.from(VISTA_ULTIMA_CONFIRMADA).select('*'),
+        supabase.from(VISTA_COBERTURA).select('*'),
         supabase
           .from('banderas_pendientes')
           .select('*')
@@ -114,13 +119,16 @@ export function useSuscripciones() {
 
       if (suscripciones.error) throw suscripciones.error
       if (confirmadas.error) throw confirmadas.error
+      if (coberturas.error) throw coberturas.error
       if (pendientes.error) throw pendientes.error
 
       const filas = suscripcionListaSchema.array().parse(suscripciones.data)
       const ultimas = ultimaConfirmadaSchema.array().parse(confirmadas.data)
       const sinConfirmar = banderaSchema.array().parse(pendientes.data)
 
+      const cobs = coberturaSchema.array().parse(coberturas.data)
       const porSuscripcion = new Map(ultimas.map((u) => [u.suscripcion_id, u]))
+      const porCobertura = new Map<string, Cobertura>(cobs.map((c) => [c.suscripcion_id, c]))
       const hoy = hoyISO()
 
       return filas
@@ -140,13 +148,16 @@ export function useSuscripciones() {
             sinConfirmar.filter((b) => b.suscripcion_id === s.id),
           )
 
+          const cobertura = porCobertura.get(s.id) ?? SIN_COBERTURA
+
           return {
             suscripcion: s,
             mensual,
             montoCiclo: mensual * s.terminos.meses,
             sugerencia,
             bandera,
-            atencion: clasificar(sugerencia.nivel, bandera),
+            cobertura,
+            atencion: clasificar(sugerencia.nivel, bandera, s.estado, cobertura, hoy),
           }
         })
         .sort((a, b) =>

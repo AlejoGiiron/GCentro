@@ -91,3 +91,21 @@ export const ultimaConfirmadaSchema = z.object({
 })
 
 export type UltimaConfirmada = z.infer<typeof ultimaConfirmadaSchema>
+
+/**
+ * Fila de la vista `suscripcion_cobertura` (migración 012): hasta cuándo
+ * llega la plata de cada contrato.
+ *
+ * `cubierto_hasta` es el MÁXIMO `cubre_hasta`, no el del último pago. Puede
+ * ser null si todos los pagos fueron ajustes o implementación — un pago sin
+ * cobertura cuenta en `pagos_registrados` pero no adelanta la fecha.
+ */
+export const coberturaSchema = z.object({
+  suscripcion_id: z.string().uuid(),
+  cubierto_hasta: z.string().nullable(),
+  ultimo_pago: z.string().nullable(),
+  // PostgREST devuelve `count(*)` como number.
+  pagos_registrados: z.number().int(),
+})
+
+export type CoberturaFila = z.infer<typeof coberturaSchema>

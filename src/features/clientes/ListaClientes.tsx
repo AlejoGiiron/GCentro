@@ -55,6 +55,7 @@ const OTRO_SISTEMA = 'bg-lienzo-panelAlt'
  * 4.5:1 contra los tres fondos.
  */
 const ATENCION: Record<Atencion, { texto: string; clase: string }> = {
+  PAGO_SIN_REACTIVAR: { texto: 'pagó, sigue restringido', clase: SENAL.critico },
   REGRESION_APLICADA: { texto: 'restringe de más', clase: SENAL.critico },
   SIN_CONFIRMAR: { texto: 'sin confirmar', clase: SENAL.alerta },
   SIN_PUENTE: { texto: 'sin puente', clase: TINTA.media },
@@ -129,7 +130,7 @@ function Bandera({ b }: { b: EstadoBandera }) {
   )
 }
 
-function Fila({ f }: { f: FilaLista }) {
+function Fila({ f, abrir }: { f: FilaLista; abrir: (f: FilaLista) => void }) {
   const s = f.suscripcion
   const a = ATENCION[f.atencion]
 
@@ -139,7 +140,12 @@ function Fila({ f }: { f: FilaLista }) {
 
       {/* ── Contrato ────────────────────────────────────────────────── */}
       <th scope="row" className={`${TD} ${SEP} text-left font-normal text-tinta-fuerte`}>
-        {s.clientes.nombre_comercial}
+        {/* El nombre es el enlace, no la fila entera: una fila clickeable
+            entera no es alcanzable por teclado y roba la selección de texto,
+            que en una tabla de trabajo se usa para copiar un monto. */}
+        <button onClick={() => abrir(f)} className={`rounded underline-offset-2 hover:underline ${FOCO}`}>
+          {s.clientes.nombre_comercial}
+        </button>
         {s.clientes.es_prueba && (
           <span className={MARCA_PRUEBA}>prueba</span>
         )}
@@ -199,7 +205,7 @@ function Fila({ f }: { f: FilaLista }) {
   )
 }
 
-export function ListaClientes() {
+export function ListaClientes({ abrir }: { abrir: (f: FilaLista) => void }) {
   const [mostrarPrueba, setMostrarPrueba] = useState(false)
   // Arranca en `hoy`: es el ritmo más frecuente (vistazo diario) y la pregunta
   // que la pantalla tiene que contestar en dos segundos.
@@ -419,7 +425,7 @@ export function ListaClientes() {
             </thead>
             <tbody>
               {filas.map((f) => (
-                <Fila key={f.suscripcion.id} f={f} />
+                <Fila key={f.suscripcion.id} f={f} abrir={abrir} />
               ))}
             </tbody>
           </table>

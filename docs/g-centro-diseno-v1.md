@@ -35,8 +35,37 @@ Falta: lo listado en §9.7 —barrido en diferido, desactivar admins en vez de b
 
 **No entra**
 
-Pasarela de pago, facturación electrónica propia, portal del cliente, métricas.
-Todo eso espera a que el modelo esté probado con uso real.
+Pasarela de pago, facturación electrónica propia, métricas. Eso espera a que el modelo
+esté probado con uso real.
+
+### El cliente NUNCA entra a G-Centro
+
+> ⚠️ **Esto no es una función postergada: es el modelo.** "Sin portal del cliente" se
+> venía leyendo como algo que llegaría más adelante, y no es así.
+
+El circuito real es:
+
+```
+cliente  →  comprobante por WhatsApp a las líneas de Giiron
+         →  un operador lo mira y decide si es válido
+         →  lo registra a mano en G-Centro
+         →  (si corresponde) confirma la bandera
+G-Centro →  banner en el POS   ← ÚNICO canal hacia el cliente
+```
+
+**El único canal desde G-Centro hacia el cliente es el banner del POS** (§6). No hay
+portal, no hay autoservicio, no hay login de cliente, y no hay notificación por correo.
+
+Tres consecuencias que se siguen de esto y no se renegocian:
+
+- **La deny-by-default sobre `admins` (§8) se queda como está.** No hay un segundo tipo
+  de usuario para el que haya que diseñar policies. Cada fila de `admins` es un empleado
+  de Giiron.
+- **La validación del pago es humana, y ese es el control.** Nadie se autoacredita un
+  pago: alguien mira el comprobante en el chat y decide. Por eso el registro manual no es
+  una carencia del v1 sino el punto de control del modelo.
+- **Por eso el mensaje del banner pesa tanto** (§6): es literalmente lo único que el
+  cliente lee de este sistema.
 
 **Multi-producto desde el modelo.** Hoy solo G-Vento (G-10 y Salchimelo). El esquema
 debe soportar G-Mura y G-Quota sin rehacerse: nada asume G-Vento, las suscripciones se
@@ -667,6 +696,32 @@ Es la misma asimetría de §4 —perjudicar a quien pagó pesa más que no cobra
 debe— aplicada al transporte en vez de a la decisión. Que las dos secciones salgan del
 mismo principio no es casualidad: es la señal de que el principio es el correcto.
 
+#### El mismo daño por otra puerta: registrar un pago no reactiva
+
+**Registrar un pago y cambiar el estado son dos acciones separadas.** Con un solo operador
+el que registraba reactivaba. Con varios, alguien registra y no reactiva — y el cliente
+queda al día con el banner puesto.
+
+Es peor que la bandera sin confirmar en un sentido: **no deja rastro**. Una bandera que
+falla deja su fila en la cola; esto no deja nada, porque de este lado todo se ve bien —
+el pago SÍ está registrado. El único que se entera es el cliente, en el mostrador.
+
+Se ataca en dos lugares, con el **mismo predicado** (`src/lib/cobertura.ts`), y que sea
+el mismo está fijado en un test — si divergieran, la pantalla podría no ofrecer reactivar
+y la lista marcar la anomalía acto seguido:
+
+- **En el momento.** Al registrar un pago cuyo `cubre_hasta` alcanza hasta hoy o más
+  allá, y con la suscripción en `gracia` o `suspendida`, la pantalla 2 ofrece reactivar
+  **marcado por default y desmarcable**. Nunca automático: §4 exige que una persona vea
+  cada estado que llega al producto, y eso incluye los amables.
+- **Como red.** Si alguien la desmarcó, la lista lo muestra como `PAGO_SIN_REACTIVAR`,
+  **la primera categoría de atención** — antes incluso que una bandera regresiva, porque
+  la evidencia es nuestra y no admite duda: el pago está en nuestra base.
+
+`cancelada` queda afuera a propósito: un contrato cancelado con cobertura vigente es
+§9.3 —el cliente se fue antes de consumir lo que pagó— y reactivarlo de paso sería
+revivir un contrato que alguien terminó a propósito.
+
 #### Lo inválido no entra a la cola
 
 **Una fila en la cola significa "esto hay que aplicarlo y se va a reintentar hasta
@@ -1200,6 +1255,27 @@ las dos observaciones de §5 sobre el arranque en frío y el crecimiento de la c
 **Todavía sin correr en vivo:** los caminos de error (400 por valor inválido, 422 por
 suscripción sin `organizacion_externa_id`). Están probados contra el doble.
 
+### 9.8 El comprobante no se guarda — DECISIÓN, no olvido
+
+**El respaldo del pago vive en WhatsApp y en el extracto bancario.** En G-Centro quedan
+`referencia` y `nota`, texto, y nada más. **No se agrega Storage.**
+
+No es una función postergada:
+
+- **Los dos respaldos que importan ya existen y son mejores.** El extracto bancario es
+  prueba ante terceros; una imagen subida a nuestro Storage no lo es. Y el chat de
+  WhatsApp tiene el contexto completo —quién mandó qué y cuándo— que un archivo suelto
+  pierde.
+- **Guardar comprobantes cambia la clase de dato que maneja el panel.** Una captura de
+  transferencia trae nombre, banco, número de cuenta y a veces cédula. Hoy toda la PII
+  del sistema está en columnas conocidas y el filtro de §7 las cubre por clave; un blob
+  no se puede allowlistear.
+- **La referencia alcanza para conciliar.** Que es la única pregunta que este panel
+  necesita contestar sobre un pago.
+
+Si algún día hace falta —una disputa, una auditoría—, lo que se agrega es un enlace al
+mensaje, no una copia del archivo.
+
 ### 9.7 Pendientes
 
 1. **El barrido en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
@@ -1215,10 +1291,10 @@ suscripción sin `organizacion_externa_id`). Están probados contra el doble.
    con `on delete set null` eso borra la autoría de todo lo que esa persona hizo (§3).
    Falta un `desactivado_en` en `admins` y que `es_admin()` lo exija en null. Toca la
    función que sostiene toda la RLS, así que no se hizo de paso.
-4. **El `motivo` de un cambio de estado.** El trigger garantiza que el evento existe pero
-   no puede saber el porqué (§3). Capturarlo pide que el cambio pase por una función que
-   lo reciba —`cambiar_estado_suscripcion(id, estado, motivo)`— con el trigger quedando
-   como red de atrás para lo que se cambie por fuera.
+4. ~~El `motivo` de un cambio de estado.~~ **RESUELTO en `013`**:
+   `cambiar_estado_suscripcion(id, estado, motivo)` lo pasa por un GUC de transacción que
+   el trigger lee. El trigger sigue siendo la garantía — un UPDATE directo escribe el
+   evento igual, con `motivo` en NULL, y la emergencia sigue funcionando.
 5. **`RESTRINGIDA` en el enum de `suscripcion_eventos`** pertenece al vocabulario de
    gating, no al comercial, así que el trigger nunca lo emite. Decidir si se registra
    cuando se aplica una bandera o si sale del enum.

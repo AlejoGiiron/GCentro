@@ -8,7 +8,8 @@
  * regla que nadie verifica.
  * ─────────────────────────────────────────────────────────────────────────
  */
-import type { Nivel, Sugerencia } from '@/lib/bandera'
+import type { EstadoComercial, FechaISO, Nivel, Sugerencia } from '@/lib/bandera'
+import { pagoSinReactivar, type Cobertura } from '@/lib/cobertura'
 import type { SuscripcionLista } from './schemas'
 
 /**
@@ -46,6 +47,8 @@ export interface FilaLista {
   /** §4. SUGIERE; no se aplica solo. */
   sugerencia: Sugerencia
   bandera: EstadoBandera
+  /** Hasta cuándo llega la plata (vista `suscripcion_cobertura`, 012). */
+  cobertura: Cobertura
   atencion: Atencion
 }
 
@@ -63,20 +66,30 @@ export interface FilaLista {
  * de sus clientes; un falso negativo lo paga Giiron, un día de suscripción.
  */
 export type Atencion =
-  /** 1 · Lo aplicado es MÁS restrictivo que lo que se decidiría hoy. Daño en curso. */
+  /**
+   * 1 · **Pagó y sigue restringido.** Hay un pago registrado que cubre hasta
+   * hoy o más allá, y el estado comercial todavía muestra banner.
+   *
+   * Va PRIMERO, incluso antes de `REGRESION_APLICADA`, por dos razones: la
+   * evidencia es nuestra y no admite duda —el pago está en nuestra base—, y
+   * se arregla en un clic sin depender de que el otro sistema responda.
+   */
+  | 'PAGO_SIN_REACTIVAR'
+  /** 2 · Lo aplicado es MÁS restrictivo que lo que se decidiría hoy. Daño en curso. */
   | 'REGRESION_APLICADA'
-  /** 2 · Se decidió algo y no se sabe si llegó. Estado desconocido. */
+  /** 3 · Se decidió algo y no se sabe si llegó. Estado desconocido. */
   | 'SIN_CONFIRMAR'
-  /** 3 · Nunca va a poder sincronizarse. Silencioso y permanente. */
+  /** 4 · Nunca va a poder sincronizarse. Silencioso y permanente. */
   | 'SIN_PUENTE'
-  /** 4 · Habría que escalar y no se hizo. Fuga de plata, sin daño al cliente. */
+  /** 5 · Habría que escalar y no se hizo. Fuga de plata, sin daño al cliente. */
   | 'FALTA_ESCALAR'
-  /** 5 · Trabajo por hacer, sin urgencia. */
+  /** 6 · Trabajo por hacer, sin urgencia. */
   | 'POR_VENCER'
-  /** 6 · Silencio. */
+  /** 7 · Silencio. */
   | 'AL_DIA'
 
 export const ORDEN_ATENCION: Atencion[] = [
+  'PAGO_SIN_REACTIVAR',
   'REGRESION_APLICADA',
   'SIN_CONFIRMAR',
   'SIN_PUENTE',
@@ -94,7 +107,18 @@ export const SEVERIDAD: Record<Nivel, number> = {
   suspendida: 4,
 }
 
-export function clasificar(sugerido: Nivel, b: EstadoBandera): Atencion {
+export function clasificar(
+  sugerido: Nivel,
+  b: EstadoBandera,
+  estado: EstadoComercial,
+  cobertura: Cobertura,
+  hoy: FechaISO,
+): Atencion {
+  // Antes que todo: hay plata registrada que cubre y el estado igual
+  // restringe. Es nuestro error, la evidencia está en nuestra base, y el
+  // cliente está pagando el banner ahora mismo.
+  if (pagoSinReactivar(estado, cobertura, hoy)) return 'PAGO_SIN_REACTIVAR'
+
   // Lo que el producto tiene aplicado AHORA. Una suscripción que nunca se
   // sincronizó está en el default del producto, que es `active` (§6) — o sea
   // `activa`. Tratarla como desconocida haría gritar a todo cliente nuevo.
@@ -127,7 +151,7 @@ export function clasificar(sugerido: Nivel, b: EstadoBandera): Atencion {
 export type Vista = 'hoy' | 'facturacion' | 'todas'
 
 export const ATENCION_DE_VISTA: Record<Vista, Atencion[] | null> = {
-  hoy: ['REGRESION_APLICADA', 'SIN_CONFIRMAR', 'SIN_PUENTE'],
+  hoy: ['PAGO_SIN_REACTIVAR', 'REGRESION_APLICADA', 'SIN_CONFIRMAR', 'SIN_PUENTE'],
   facturacion: ['FALTA_ESCALAR', 'POR_VENCER'],
   todas: null,
 }

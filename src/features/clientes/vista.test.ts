@@ -18,7 +18,18 @@ import {
   type EstadoBandera,
   type FilaLista,
 } from './vista'
-import { NIVELES, type Nivel } from '@/lib/bandera'
+import { NIVELES, type EstadoComercial, type Nivel } from '@/lib/bandera'
+import { SIN_COBERTURA, type Cobertura } from '@/lib/cobertura'
+
+const HOY = '2026-08-16'
+
+/** `clasificar` con el contexto que no cambia en la mayoría de los casos. */
+const clasif = (
+  sugerido: Nivel,
+  b: EstadoBandera,
+  estado: EstadoComercial = 'activa',
+  cobertura: Cobertura = SIN_COBERTURA,
+) => clasificar(sugerido, b, estado, cobertura, HOY)
 
 // ── Constructores mínimos ─────────────────────────────────────────────────
 
@@ -62,6 +73,7 @@ function fila(o: {
     mensual: 80000,
     sugerencia: { nivel: 'activa', dias_para_cobro: 30, regla: 'ACTIVA_CON_MARGEN' },
     bandera: nunca(),
+    cobertura: SIN_COBERTURA,
     atencion: o.atencion,
   }
 }
@@ -73,52 +85,52 @@ describe('clasificar', () => {
   it('lo aplicado MÁS restrictivo que lo decidido → REGRESION_APLICADA', () => {
     // El caso que importa: el cliente pagó, se lo devolvió a `activa`, y el
     // producto sigue en `restringida`. Está bloqueado y ya cumplió.
-    expect(clasificar('activa', confirmada('restringida'))).toBe('REGRESION_APLICADA')
-    expect(clasificar('gracia', confirmada('suspendida'))).toBe('REGRESION_APLICADA')
-    expect(clasificar('por_vencer', confirmada('gracia'))).toBe('REGRESION_APLICADA')
+    expect(clasif('activa', confirmada('restringida'))).toBe('REGRESION_APLICADA')
+    expect(clasif('gracia', confirmada('suspendida'))).toBe('REGRESION_APLICADA')
+    expect(clasif('por_vencer', confirmada('gracia'))).toBe('REGRESION_APLICADA')
   })
 
   it('la regresión GANA sobre los intentos fallidos', () => {
     // Una fila puede estar restringiendo de más Y tener intentos que fallaron.
     // Lo que duele es lo primero: hay un cliente bloqueado ahora mismo.
-    expect(clasificar('activa', confirmada('suspendida', 3))).toBe('REGRESION_APLICADA')
+    expect(clasif('activa', confirmada('suspendida', 3))).toBe('REGRESION_APLICADA')
   })
 
   it('intentos sin confirmar → SIN_CONFIRMAR', () => {
-    expect(clasificar('activa', confirmada('activa', 1))).toBe('SIN_CONFIRMAR')
-    expect(clasificar('gracia', nunca(2))).toBe('SIN_CONFIRMAR')
+    expect(clasif('activa', confirmada('activa', 1))).toBe('SIN_CONFIRMAR')
+    expect(clasif('gracia', nunca(2))).toBe('SIN_CONFIRMAR')
   })
 
   it('sin puente → SIN_PUENTE, aunque no haya nada pendiente', () => {
-    expect(clasificar('activa', sinPuente())).toBe('SIN_PUENTE')
+    expect(clasif('activa', sinPuente())).toBe('SIN_PUENTE')
     // Y no se disfraza de "falta escalar": no es que no se hizo, es que no
     // se puede hacer. Son problemas distintos con soluciones distintas.
-    expect(clasificar('suspendida', sinPuente())).toBe('SIN_PUENTE')
+    expect(clasif('suspendida', sinPuente())).toBe('SIN_PUENTE')
   })
 
   it('habría que escalar y no se escaló → FALTA_ESCALAR', () => {
-    expect(clasificar('gracia', confirmada('activa'))).toBe('FALTA_ESCALAR')
-    expect(clasificar('suspendida', confirmada('gracia'))).toBe('FALTA_ESCALAR')
+    expect(clasif('gracia', confirmada('activa'))).toBe('FALTA_ESCALAR')
+    expect(clasif('suspendida', confirmada('gracia'))).toBe('FALTA_ESCALAR')
   })
 
   it('una suscripción que NUNCA se sincronizó y debería estar activa NO grita', () => {
     // El producto arranca en su default, que es `active` (§6). Tratarla como
     // desconocida haría que todo cliente nuevo apareciera como problema.
-    expect(clasificar('activa', nunca())).toBe('AL_DIA')
+    expect(clasif('activa', nunca())).toBe('AL_DIA')
   })
 
   it('pero si nunca se sincronizó y debería estar restringida, SÍ grita', () => {
-    expect(clasificar('restringida', nunca())).toBe('FALTA_ESCALAR')
+    expect(clasif('restringida', nunca())).toBe('FALTA_ESCALAR')
   })
 
   it('por_vencer sin nada pendiente → POR_VENCER', () => {
-    expect(clasificar('por_vencer', confirmada('por_vencer'))).toBe('POR_VENCER')
+    expect(clasif('por_vencer', confirmada('por_vencer'))).toBe('POR_VENCER')
   })
 
   it('todo en su lugar → AL_DIA', () => {
-    expect(clasificar('activa', confirmada('activa'))).toBe('AL_DIA')
-    expect(clasificar('gracia', confirmada('gracia'))).toBe('AL_DIA')
-    expect(clasificar('suspendida', confirmada('suspendida'))).toBe('AL_DIA')
+    expect(clasif('activa', confirmada('activa'))).toBe('AL_DIA')
+    expect(clasif('gracia', confirmada('gracia'))).toBe('AL_DIA')
+    expect(clasif('suspendida', confirmada('suspendida'))).toBe('AL_DIA')
   })
 
   it('devuelve siempre una categoría conocida, para toda combinación', () => {
@@ -131,12 +143,12 @@ describe('clasificar', () => {
     ]
     for (const sugerido of NIVELES) {
       for (const b of banderas) {
-        expect(ORDEN_ATENCION).toContain(clasificar(sugerido, b))
+        expect(ORDEN_ATENCION).toContain(clasif(sugerido, b))
       }
     }
   })
 
-  it('las seis categorías son alcanzables: ninguna es código muerto', () => {
+  it('las siete categorías son alcanzables: ninguna es código muerto', () => {
     const vistas = new Set<Atencion>()
     const banderas = [
       ...NIVELES.map((nv) => confirmada(nv)),
@@ -144,8 +156,35 @@ describe('clasificar', () => {
       nunca(),
       sinPuente(),
     ]
-    for (const sugerido of NIVELES) for (const b of banderas) vistas.add(clasificar(sugerido, b))
+    const estados: EstadoComercial[] = ['activa', 'gracia', 'suspendida', 'cancelada']
+    const cobs: Cobertura[] = [
+      SIN_COBERTURA,
+      { cubierto_hasta: '2026-12-31', ultimo_pago: '2026-08-01', pagos_registrados: 1 },
+    ]
+    for (const sugerido of NIVELES)
+      for (const b of banderas)
+        for (const e of estados)
+          for (const c of cobs) vistas.add(clasificar(sugerido, b, e, c, HOY))
     expect(vistas.size).toBe(ORDEN_ATENCION.length)
+  })
+
+  it('PAGO_SIN_REACTIVAR gana sobre TODO lo demás', () => {
+    // Es la única categoría cuya evidencia está entera de nuestro lado: el
+    // pago está en nuestra base. Aunque además la bandera esté sin confirmar
+    // o restringiendo de más, lo que hay que arreglar primero es esto —
+    // y se arregla en un clic, sin depender del otro sistema.
+    const pago: Cobertura = {
+      cubierto_hasta: '2026-12-31',
+      ultimo_pago: '2026-08-01',
+      pagos_registrados: 1,
+    }
+    for (const b of [confirmada('suspendida'), confirmada('activa', 3), nunca(2), sinPuente()]) {
+      expect(clasificar('activa', b, 'gracia', pago, HOY)).toBe('PAGO_SIN_REACTIVAR')
+    }
+  })
+
+  it('sin pago que cubra, el estado gracia no cambia nada', () => {
+    expect(clasificar('gracia', confirmada('gracia'), 'gracia', SIN_COBERTURA, HOY)).toBe('AL_DIA')
   })
 })
 
@@ -165,6 +204,7 @@ describe('perjudicar a quien pagó pesa más que no cobrarle a quien debe', () =
 
   it('el orden completo es el aprobado', () => {
     expect(ORDEN_ATENCION).toEqual([
+      'PAGO_SIN_REACTIVAR',
       'REGRESION_APLICADA',
       'SIN_CONFIRMAR',
       'SIN_PUENTE',
