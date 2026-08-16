@@ -22,8 +22,12 @@
 --
 -- El motivo viaja por un GUC de transacción y no por un parámetro del trigger
 -- porque un trigger no recibe parámetros. `set_config(..., true)` lo hace
--- LOCAL: muere con la transacción y no se filtra a la siguiente operación de
--- la misma conexión, que en un pooler sería de otro usuario.
+-- LOCAL a la transacción: muere con ella y no se filtra a la siguiente
+-- operación de la misma conexión, que en un pooler sería de otro usuario.
+--
+-- ⚠️ Local a la TRANSACCIÓN no es local a la SENTENCIA, y esa diferencia es un
+-- defecto real que encontró el bloque de verificación de acá abajo. Ver el
+-- comentario de la RPC: el motivo se limpia apenas termina el update.
 
 begin;
 
@@ -84,6 +88,8 @@ language plpgsql
 security invoker
 set search_path = ''
 as $$
+declare
+  filas int;
 begin
   if p_estado not in ('activa','gracia','suspendida','cancelada') then
     raise exception 'estado invalido: %', p_estado;
@@ -95,7 +101,32 @@ begin
      set estado = p_estado
    where id = p_suscripcion_id;
 
-  if not found then
+  -- ⚠️ ROW_COUNT y no `FOUND`. `perform` es una sentencia SQL y PISA `FOUND`:
+  -- con el `set_config` de abajo en el medio, un `if not found` siempre daría
+  -- falso y una suscripción inexistente pasaría en silencio en vez de fallar.
+  -- Se captura acá, pegado al update, antes de que nada lo toque.
+  get diagnostics filas = row_count;
+
+  -- ⚠️ SE LIMPIA APENAS TERMINA EL UPDATE, y esto no es prolijidad.
+  --
+  -- `set_config(..., true)` es local a la TRANSACCIÓN, no a la sentencia: sin
+  -- esta línea el motivo queda seteado para todo lo que venga después en la
+  -- misma transacción, y el trigger se lo aplica a un cambio que no es suyo.
+  --
+  -- Lo encontró el bloque de verificación de esta misma migración, que hacía
+  -- un UPDATE directo después de llamar a la RPC y recibió el motivo de la
+  -- llamada anterior. En producción cada request de supabase-js es su propia
+  -- transacción, así que hoy no se dispara — pero el día que alguien envuelva
+  -- dos cambios en una transacción, el segundo hereda el motivo del primero y
+  -- el historial miente sin que nada falle.
+  --
+  -- Se limpia DESPUÉS del update y no dentro del trigger a propósito: un
+  -- UPDATE que toca varias filas dispara el trigger una vez por fila, y todas
+  -- son parte del mismo cambio. Consumir el valor en la primera le robaría el
+  -- motivo a las demás.
+  perform set_config('app.motivo', '', true);
+
+  if filas = 0 then
     raise exception 'la suscripcion no existe o no es visible: %', p_suscripcion_id;
   end if;
 end;
@@ -136,9 +167,14 @@ begin
     raise exception 'el motivo no llego al evento: %', ev.motivo;
   end if;
 
-  -- Y un UPDATE DIRECTO sigue funcionando, sin motivo. Es el camino de la
-  -- emergencia: si esto fallara, la RPC habría dejado de ser un atajo para
-  -- convertirse en el único camino.
+  -- Y un UPDATE DIRECTO sigue funcionando, SIN heredar el motivo de arriba.
+  --
+  -- Esta comprobación encontró un defecto real el 16/08/2026: el GUC es local
+  -- a la transacción, así que sin limpiarlo el update de acá abajo recibía el
+  -- motivo de la llamada anterior y el evento salía con un motivo ajeno.
+  --
+  -- Verifica dos cosas a la vez: que el camino de la emergencia sigue abierto,
+  -- y que el motivo no se derrama al cambio siguiente.
   select coalesce(array_agg(id), '{}') into ids
     from public.suscripcion_eventos where suscripcion_id = sus_id;
   update public.suscripciones set estado = previo where id = sus_id;
@@ -148,7 +184,28 @@ begin
     raise exception 'un update directo trajo motivo, y no deberia: %', ev.motivo;
   end if;
 
-  raise notice 'RPC OK: motivo registrado, y el UPDATE directo sigue funcionando sin el';
+  -- Y dos llamadas seguidas en la MISMA transacción: la segunda no hereda.
+  -- Es la forma más filosa de la invariante, y la que se rompía.
+  select coalesce(array_agg(id), '{}') into ids
+    from public.suscripcion_eventos where suscripcion_id = sus_id;
+  perform public.cambiar_estado_suscripcion(sus_id, destino, null);
+  select * into ev from public.suscripcion_eventos
+   where suscripcion_id = sus_id and not (id = any(ids));
+  if ev.motivo is not null then
+    raise exception 'la segunda llamada heredo el motivo de la primera: %', ev.motivo;
+  end if;
+
+  -- Y una suscripcion inexistente TIENE que fallar (el chequeo de ROW_COUNT).
+  begin
+    perform public.cambiar_estado_suscripcion(
+      '00000000-0000-4000-8000-000000000000'::uuid, 'activa', null);
+    raise exception 'una suscripcion inexistente no fallo, y deberia';
+  exception
+    when sqlstate 'P0001' then
+      if sqlerrm not like '%no existe o no es visible%' then raise; end if;
+  end;
+
+  raise notice 'RPC OK: motivo registrado, no se derrama, y el UPDATE directo sigue funcionando';
   raise exception using message = 'VERIFICACION_OK', errcode = 'RB999';
 exception
   when sqlstate 'RB999' then
