@@ -46,18 +46,6 @@ import {
 import { SIN_COBERTURA, type Cobertura } from '@/lib/cobertura'
 import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
-/**
- * ⚠️ PENDIENTE DE REGENERAR TIPOS (marcador: TIPOS-012).
- *
- * `suscripcion_cobertura` la crea la migración `012`, sin aplicar todavía, así
- * que `database.types.ts` no la conoce. El cast es sobre el NOMBRE de la
- * relación, no sobre la forma: `coberturaSchema` valida en runtime, que es la
- * garantía que importa (regla 3: los tipos no se escriben a mano).
- *
- * Se saca al correr `supabase gen types typescript --linked`.
- */
-const VISTA_COBERTURA = 'suscripcion_cobertura' as 'clientes_cobrables'
-
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
   descuento_pct, proximo_cobro, periodo_actual_inicio, periodo_actual_fin,
@@ -104,7 +92,7 @@ export function useSuscripciones() {
       const [suscripciones, confirmadas, coberturas, pendientes] = await Promise.all([
         supabase.from('suscripciones').select(SELECT),
         supabase.from('bandera_ultima_confirmada').select('*'),
-        supabase.from(VISTA_COBERTURA).select('*'),
+        supabase.from('suscripcion_cobertura').select('*'),
         supabase
           .from('banderas_pendientes')
           .select('*')

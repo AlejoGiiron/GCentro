@@ -19,16 +19,6 @@ import type { Nivel } from '@/lib/bandera'
 import { eventoSchema, pagoSchema, type FormularioPago } from './schemas'
 import type { EstadoComercial } from '@/lib/bandera'
 
-/**
- * ⚠️ PENDIENTE DE REGENERAR TIPOS (marcador: TIPOS-013).
- *
- * La RPC la crea la migración `013`, que todavía no está aplicada. El cast es
- * sobre el NOMBRE, no sobre los argumentos ni el resultado: los argumentos se
- * arman acá abajo con nombres explícitos y la función no devuelve nada.
- * Se saca al correr `supabase gen types typescript --linked`.
- */
-const RPC_CAMBIAR_ESTADO = 'cambiar_estado_suscripcion' as 'es_admin'
-
 const SELECT_EVENTOS = `
   id, tipo, estado_anterior, estado_nuevo, motivo, datos, efectivo_desde,
   creado_en, admin_id, admins ( email )
@@ -84,11 +74,13 @@ export function useCambiarEstado(suscripcionId: string) {
     meta: { area: 'clientes' },
     mutationKey: ['cambiar-estado'],
     mutationFn: async (v: { estado: EstadoComercial; motivo?: string }) => {
-      const { error } = await supabase.rpc(RPC_CAMBIAR_ESTADO, {
+      // `undefined` y no `null`: los tipos generados declaran `p_motivo`
+      // opcional, y omitirlo deja que Postgres use su `default null`.
+      const { error } = await supabase.rpc('cambiar_estado_suscripcion', {
         p_suscripcion_id: suscripcionId,
         p_estado: v.estado,
-        p_motivo: v.motivo?.trim() || null,
-      } as never)
+        p_motivo: v.motivo?.trim() || undefined,
+      })
       if (error) throw error
     },
     onSuccess: invalidar,
@@ -126,11 +118,11 @@ export function useRegistrarPago(suscripcionId: string, clienteId: string) {
       if (error) throw error
 
       if (v.reactivar) {
-        const { error: e2 } = await supabase.rpc(RPC_CAMBIAR_ESTADO, {
+        const { error: e2 } = await supabase.rpc('cambiar_estado_suscripcion', {
           p_suscripcion_id: suscripcionId,
           p_estado: 'activa',
           p_motivo: `Reactivada al registrar el pago del ${v.pago.fecha_pago}.`,
-        } as never)
+        })
         if (e2) throw e2
       }
     },

@@ -545,6 +545,30 @@ export type Database = {
         }
         Relationships: []
       }
+      suscripcion_cobertura: {
+        Row: {
+          cubierto_hasta: string | null
+          pagos_registrados: number | null
+          suscripcion_id: string | null
+          ultimo_pago: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones_cobrables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suscripciones_cobrables: {
         Row: {
           cliente_id: string | null
@@ -607,6 +631,10 @@ export type Database = {
     }
     Functions: {
       admin_actual: { Args: never; Returns: string }
+      cambiar_estado_suscripcion: {
+        Args: { p_estado: string; p_motivo?: string; p_suscripcion_id: string }
+        Returns: undefined
+      }
       es_admin: { Args: never; Returns: boolean }
     }
     Enums: {
