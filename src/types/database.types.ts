@@ -41,6 +41,7 @@ export type Database = {
           creado_en: string
           id: string
           intentos: number
+          mensaje: string | null
           suscripcion_id: string
           ultimo_error: string | null
           valor_deseado: string
@@ -53,6 +54,7 @@ export type Database = {
           creado_en?: string
           id?: string
           intentos?: number
+          mensaje?: string | null
           suscripcion_id: string
           ultimo_error?: string | null
           valor_deseado: string
@@ -65,6 +67,7 @@ export type Database = {
           creado_en?: string
           id?: string
           intentos?: number
+          mensaje?: string | null
           suscripcion_id?: string
           ultimo_error?: string | null
           valor_deseado?: string
