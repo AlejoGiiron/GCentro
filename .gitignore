@@ -27,3 +27,7 @@ supabase/.temp/
 # proyecto, igual que CLAUDE.md.
 .claude/skills/
 .gemini/
+
+# Temporal que deja vite al resolver la config. Se borra solo, pero a veces
+# sobrevive a un build interrumpido.
+vite.config.ts.timestamp-*
