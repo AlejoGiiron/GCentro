@@ -29,10 +29,20 @@ export default defineConfig({
       : []),
   ],
   build: {
-    // 'hidden' genera los .map PERO no escribe el comentario
-    // `//# sourceMappingURL=` en los bundles: el navegador no los pide y
-    // Sentry los usa igual, porque los asocia por debug id inyectado.
-    sourcemap: 'hidden',
+    // ⚠️ LA MISMA CONDICIÓN QUE AGREGA EL PLUGIN, a propósito.
+    //
+    // El que borra los `.map` del build es el plugin de Sentry, DESPUÉS de
+    // subirlos. Sin token no se agrega, así que con `'hidden'` fijo los mapas
+    // quedaban en `dist/` y el hosting los publicaba: el código fuente
+    // completo del panel, legible desde devtools.
+    //
+    // Dos condiciones separadas para la misma decisión divergen — alguien
+    // toca una y la otra queda mintiendo. Es la misma variable.
+    //
+    // `'hidden'` genera los `.map` pero NO escribe el comentario
+    // `//# sourceMappingURL=`: el navegador no los pide y Sentry los usa
+    // igual, porque los asocia por el debug id que inyecta el plugin.
+    sourcemap: subeSourceMaps ? 'hidden' : false,
   },
   resolve: {
     alias: {
