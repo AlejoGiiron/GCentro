@@ -52,14 +52,19 @@ export type ReglaSugerencia =
   | 'GRACIA_PROLONGADA'
   | 'GRACIA_SIN_VENCER'
   | 'ESTADO_TERMINAL'
+  /** No hay pagos con cobertura: no se puede calcular una fecha (015). */
+  | 'SIN_HISTORIAL'
 
 export interface Sugerencia {
   nivel: Nivel
   /**
    * Días de `hoy` a `proximo_cobro`. Positivo = falta; 0 = vence hoy;
    * negativo = vencido hace tantos días.
+   *
+   * **`null` cuando no hay historial de pagos.** No es cero ni infinito: es
+   * que no se puede calcular.
    */
-  dias_para_cobro: number
+  dias_para_cobro: number | null
   regla: ReglaSugerencia
 }
 
@@ -88,9 +93,31 @@ export interface Sugerencia {
  */
 export function nivelSugerido(
   estado: EstadoComercial,
-  proximoCobro: FechaISO,
+  /** `null` si la suscripción no tiene pagos con cobertura (015). */
+  proximoCobro: FechaISO | null,
   hoy: FechaISO,
 ): Sugerencia {
+  // ── SIN HISTORIAL DE PAGOS ──────────────────────────────────────────────
+  //
+  // Desde 015 la fecha se deriva de los pagos, así que puede no existir. No
+  // se inventa: la aritmética con `null` daría `NaN` días y una sugerencia
+  // sin sentido que igual se vería como una decisión.
+  //
+  // El nivel sale del ESTADO COMERCIAL, que es lo único que se sabe:
+  //   · terminal → suspendida, que no dependía de la fecha.
+  //   · gracia   → gracia. Un humano lo escribió a propósito.
+  //   · activa   → activa. §5, fail-open: **no se restringe a nadie por un
+  //                dato que nos falta a nosotros.**
+  if (proximoCobro === null) {
+    const nivel: Nivel =
+      estado === 'suspendida' || estado === 'cancelada'
+        ? 'suspendida'
+        : estado === 'gracia'
+          ? 'gracia'
+          : 'activa'
+    return { nivel, dias_para_cobro: null, regla: 'SIN_HISTORIAL' }
+  }
+
   const dias = differenceInCalendarDays(parseISO(proximoCobro), parseISO(hoy))
 
   if (estado === 'suspendida' || estado === 'cancelada') {

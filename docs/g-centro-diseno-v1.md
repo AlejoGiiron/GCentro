@@ -243,7 +243,7 @@ El contrato.
 | `fecha_inicio` | `date` | |
 | `periodo_actual_inicio` | `date` | |
 | `periodo_actual_fin` | `date` | |
-| `proximo_cobro` | `date` | derivado del último `cubre_hasta` |
+| ~~`proximo_cobro`~~ | — | **eliminada en `015`.** Se deriva; ver abajo |
 | `estado_implementacion` | `text` | `pendiente` · `cobrada` · `exonerada_condicional` · `exonerada` — ver §9.3 |
 | `organizacion_externa_id` | `uuid` | id de la organización en la base del producto |
 | `creado_en` | `timestamptz` | |
@@ -313,9 +313,32 @@ la tasa aplicada. Se guardan los tres y no se derivan dos del tercero: la tasa c
 por decreto, y un pago viejo tiene que seguir explicándose con la tasa que tenía ese
 día. Recalcular hacia atrás es exactamente el bug que deja el histórico sin cuadrar.
 
-El par `cubre_desde` / `cubre_hasta` es lo que hace que el histórico sirva:
-`proximo_cobro` se calcula del último `cubre_hasta`, no de un campo que se actualiza a
-mano y se desincroniza.
+El par `cubre_desde` / `cubre_hasta` es lo que hace que el histórico sirva.
+
+#### `proximo_cobro` se DERIVA — y hasta `015` no era cierto
+
+> ⚠️ **Esta sección afirmaba, en dos lugares, que `proximo_cobro` se calculaba del último
+> `cubre_hasta`. Nunca se construyó.** Era una columna que sólo tenía el valor del seed, y
+> registrar un pago no la movía: un cliente pagaba septiembre y el panel seguía sugiriendo
+> `por_vencer` para siempre. Es el tercer caso de la misma familia —una propiedad escrita
+> que el código no sostenía— y el más caro, porque ensuciaba la vista «Hoy» todos los días.
+
+Desde `015` sale de la vista `suscripcion_cobertura`:
+
+```
+proximo_cobro = MAX(cubre_hasta) + 1 día
+```
+
+**Se deriva y no se actualiza**, y esa es la decisión. Escribirla en cada pago reintroduce
+el problema entero: cada camino de escritura nuevo —un importador, el SQL Editor, una
+pantalla futura— tiene que acordarse, y el que se olvide falla en silencio. **Una
+invariante que depende de que alguien la recuerde no es una invariante.**
+
+**Sin pagos con cobertura, es `NULL`.** No es "vence hoy" ni "nunca vence": es que no se
+puede calcular. Cuarta aparición del mismo criterio, después de `admin_id`,
+`cambio_efectivo` y `mensaje` — el histórico no se rellena, se admite. La lista lo muestra
+como `SIN_HISTORIAL`, categoría de atención propia, y en «Facturación» esas filas van
+primero: lo que no se puede calcular es lo primero que hay que mirar.
 
 **Sin tabla de facturas ni de cargos en v1.** Se registra plata que entró; la obligación
 se calcula. Cuando entre la pasarela va a hacer falta el ledger, pero para ese día el
@@ -1220,7 +1243,7 @@ confirma que un admin real sí lee. Todo en transacciones con `rollback`.
 Corre `set local role` en cada prueba a propósito: el SQL Editor es `postgres`, dueño
 de las tablas, y no pasa por RLS — un `select` suelto ahí muestra todo y no prueba nada.
 
-> ### ⚠️ PENDIENTE — el backup NO está montado
+> ### ⚠️ PENDIENTE — el backup NO está montado NI VERIFICADO
 >
 > Esto es una **acción sin hacer**, no una descripción de lo que hay. Estuvo redactado en
 > presente —"sumar esta base al ciclo de backup nocturno"— y se leía como si ya existiera;
@@ -1229,6 +1252,10 @@ de las tablas, y no pasa por RLS — un `select` suelto ahí muestra todo y no p
 >
 > **Falta: sumar esta base al ciclo de backup nocturno ya montado, y verificar una
 > restauración.** Un backup que nunca se restauró no se sabe si es un backup.
+>
+> **Esta sección queda marcada como NO VERIFICADA hasta que haya una fecha concreta de
+> restauración probada.** No basta con que el backup exista; hasta entonces, cualquier
+> afirmación sobre la recuperabilidad de esta base es una intención.
 >
 > El volumen no es el argumento: los datos son pocos y van a seguir siendo pocos aun con
 > cincuenta clientes. El argumento es que son **irreemplazables**. Si se pierde el
@@ -1366,17 +1393,26 @@ mensaje, no una copia del archivo.
    desescalada**: una bandera menos restrictiva que lo aplicado tiene que reintentarse
    sola, porque mientras no llegue hay un cliente al día pagando el banner. Falta el
    barrido periódico; el índice parcial de `banderas_pendientes` ya está para eso.
-2. **La UI.** El nivel se deriva y se envía, y la lista existe, pero el botón de confirmar
-   —con estado de carga, ver §5—, la cola de pendientes y el editor del mensaje del banner
-   —que según §6 es la palanca real de cobranza— siguen pendientes.
-3. **Desactivar admins en vez de borrarlos.** Hoy revocar un acceso es borrar la fila, y
+2. **`periodo_actual_inicio` y `periodo_actual_fin` tienen la misma enfermedad que
+   tenía `proximo_cobro`.** Se fijan al firmar y **nada los avanza al terminar un
+   ciclo**: un mensual firmado en enero sigue diciendo que su período actual es el de
+   enero. Hoy no se nota porque sólo los usa el modelo de cambio de plan, que no tiene
+   pantalla — o sea que el defecto está escondido detrás de código inalcanzable, que es
+   la peor forma de tenerlo. Derivar `proximo_cobro` (`015`) hizo desaparecer el síntoma
+   visible; éste sigue ahí.
+3. ~~La UI.~~ **HECHA.** Las cuatro pantallas existen: la lista, el detalle con sus tres
+   acciones, la cola de banderas y el editor del mensaje. Lo que falta para usarlas no son
+   pantallas: es **dónde vive la aplicación en producción**. Hoy corre con `pnpm dev` en
+   una máquina, lo que hace imposible que exista un segundo operador — el supuesto central
+   de `PRODUCT.md`.
+4. **Desactivar admins en vez de borrarlos.** Hoy revocar un acceso es borrar la fila, y
    con `on delete set null` eso borra la autoría de todo lo que esa persona hizo (§3).
    Falta un `desactivado_en` en `admins` y que `es_admin()` lo exija en null. Toca la
    función que sostiene toda la RLS, así que no se hizo de paso.
-4. ~~El `motivo` de un cambio de estado.~~ **RESUELTO en `013`**:
+5. ~~El `motivo` de un cambio de estado.~~ **RESUELTO en `013`**:
    `cambiar_estado_suscripcion(id, estado, motivo)` lo pasa por un GUC de transacción que
    el trigger lee. El trigger sigue siendo la garantía — un UPDATE directo escribe el
    evento igual, con `motivo` en NULL, y la emergencia sigue funcionando.
-5. **`RESTRINGIDA` en el enum de `suscripcion_eventos`** pertenece al vocabulario de
+6. **`RESTRINGIDA` en el enum de `suscripcion_eventos`** pertenece al vocabulario de
    gating, no al comercial, así que el trigger nunca lo emite. Decidir si se registra
    cuando se aplica una bandera o si sale del enum.

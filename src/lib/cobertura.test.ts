@@ -14,12 +14,15 @@ import {
   type Cobertura,
 } from './cobertura'
 import type { EstadoComercial } from './bandera'
+import { addDays, formatISO, parseISO } from 'date-fns'
 
 const HOY = '2026-08-16'
 const cob = (hasta: string | null): Cobertura => ({
   cubierto_hasta: hasta,
   ultimo_pago: '2026-08-01',
   pagos_registrados: 1,
+  // Lo que devolvería la vista (015): el día siguiente al último cubierto.
+  proximo_cobro: hasta ? formatISO(addDays(parseISO(hasta), 1), { representation: 'date' }) : null,
 })
 
 describe('estaCubierto', () => {

@@ -48,7 +48,7 @@ import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
-  descuento_pct, proximo_cobro, periodo_actual_inicio, periodo_actual_fin,
+  descuento_pct, periodo_actual_inicio, periodo_actual_fin,
   organizacion_externa_id,
   clientes!inner ( id, nombre_comercial, es_prueba ),
   productos!inner ( codigo, nombre, url_aplicar_estado ),
@@ -124,17 +124,17 @@ export function useSuscripciones() {
             termino_meses: s.terminos.meses,
           }
           const mensual = mensualEfectivo(tarifa)
-          const sugerencia = nivelSugerido(s.estado, s.proximo_cobro, hoy)
+          const cobertura = porCobertura.get(s.id) ?? SIN_COBERTURA
+          const sugerencia = nivelSugerido(s.estado, cobertura.proximo_cobro, hoy)
           const bandera = derivarBandera(
             s,
             porSuscripcion.get(s.id),
             sinConfirmar.filter((b) => b.suscripcion_id === s.id),
           )
 
-          const cobertura = porCobertura.get(s.id) ?? SIN_COBERTURA
-
           return {
             suscripcion: s,
+            proximo_cobro: cobertura.proximo_cobro,
             mensual,
             montoCiclo: mensual * s.terminos.meses,
             sugerencia,

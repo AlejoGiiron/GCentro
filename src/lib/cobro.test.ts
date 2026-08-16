@@ -131,7 +131,7 @@ describe('upgrade — se paga la diferencia, la fecha no se mueve', () => {
   it('NO mueve la fecha de vencimiento', () => {
     const r = calcularCambioDePlan(esencialAnual, profesionalAnual, PERIODO_ANUAL, CAMBIO)
     expect(r.periodo_actual_fin).toBe('2026-12-31')
-    expect(r.proximo_cobro).toBe('2027-01-01')
+    expect(r.proximo_cobro_sugerido).toBe('2027-01-01')
   })
 
   it('un upgrade el último día cobra un solo día de diferencia', () => {
@@ -185,7 +185,7 @@ describe('downgrade — el saldo se convierte, la fecha se extiende', () => {
     const r = calcularCambioDePlan(profesionalAnual, esencialAnual, PERIODO_ANUAL, CAMBIO)
     // El saldo compra más días porque el plan nuevo es más barato.
     expect(r.periodo_actual_fin > '2026-12-31').toBe(true)
-    expect(r.proximo_cobro > r.periodo_actual_fin).toBe(true)
+    expect(r.proximo_cobro_sugerido > r.periodo_actual_fin).toBe(true)
   })
 
   it('los días nuevos salen de dividir el saldo por la tarifa nueva', () => {

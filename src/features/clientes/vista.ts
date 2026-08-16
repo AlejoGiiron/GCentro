@@ -49,6 +49,12 @@ export interface FilaLista {
   bandera: EstadoBandera
   /** Hasta cuándo llega la plata (vista `suscripcion_cobertura`, 012). */
   cobertura: Cobertura
+  /**
+   * Derivado de los pagos (015), NO una columna. `null` = sin historial.
+   * Vive en la fila y no en `suscripcion` justamente porque ya no es un
+   * campo del contrato.
+   */
+  proximo_cobro: string | null
   atencion: Atencion
 }
 
@@ -81,6 +87,14 @@ export type Atencion =
   | 'SIN_CONFIRMAR'
   /** 4 · Nunca va a poder sincronizarse. Silencioso y permanente. */
   | 'SIN_PUENTE'
+  /**
+   * 5 · **No hay pagos registrados**, así que no se puede calcular ninguna
+   * fecha (015). No es que el cliente no pague: es que no lo sabemos.
+   *
+   * Va junto a `SIN_PUENTE` porque son la misma clase de problema — un punto
+   * ciego estructural y permanente, no algo que se resuelva esperando.
+   */
+  | 'SIN_HISTORIAL'
   /** 5 · Habría que escalar y no se hizo. Fuga de plata, sin daño al cliente. */
   | 'FALTA_ESCALAR'
   /** 6 · Trabajo por hacer, sin urgencia. */
@@ -93,6 +107,7 @@ export const ORDEN_ATENCION: Atencion[] = [
   'REGRESION_APLICADA',
   'SIN_CONFIRMAR',
   'SIN_PUENTE',
+  'SIN_HISTORIAL',
   'FALTA_ESCALAR',
   'POR_VENCER',
   'AL_DIA',
@@ -131,6 +146,9 @@ export function clasificar(
   }
   if (b.sinConfirmar > 0) return 'SIN_CONFIRMAR'
   if (b.clase === 'sin_puente') return 'SIN_PUENTE'
+  // Sin fecha calculable no hay nada que sugerir sobre cobranza. Va después
+  // del puente porque una bandera rota duele más que un dato que falta.
+  if (cobertura.proximo_cobro === null) return 'SIN_HISTORIAL'
   if (SEVERIDAD[sugerido] > SEVERIDAD[aplicado]) return 'FALTA_ESCALAR'
   if (sugerido === 'por_vencer') return 'POR_VENCER'
   return 'AL_DIA'
@@ -151,7 +169,7 @@ export function clasificar(
 export type Vista = 'hoy' | 'facturacion' | 'todas'
 
 export const ATENCION_DE_VISTA: Record<Vista, Atencion[] | null> = {
-  hoy: ['PAGO_SIN_REACTIVAR', 'REGRESION_APLICADA', 'SIN_CONFIRMAR', 'SIN_PUENTE'],
+  hoy: ['PAGO_SIN_REACTIVAR', 'REGRESION_APLICADA', 'SIN_CONFIRMAR', 'SIN_PUENTE', 'SIN_HISTORIAL'],
   facturacion: ['FALTA_ESCALAR', 'POR_VENCER'],
   todas: null,
 }
@@ -195,8 +213,14 @@ export function aplicarVista(filas: FilaLista[], f: Filtros): FilaLista[] {
     return true
   })
 
-  const porFecha = (a: FilaLista, b: FilaLista) =>
-    a.suscripcion.proximo_cobro.localeCompare(b.suscripcion.proximo_cobro)
+  // Los `null` primero: son los que menos se saben, y en una tanda de
+  // facturación lo que no se puede calcular es lo primero que hay que mirar.
+  const porFecha = (a: FilaLista, b: FilaLista) => {
+    if (a.proximo_cobro === b.proximo_cobro) return 0
+    if (a.proximo_cobro === null) return -1
+    if (b.proximo_cobro === null) return 1
+    return a.proximo_cobro.localeCompare(b.proximo_cobro)
+  }
   const porNombre = (a: FilaLista, b: FilaLista) =>
     a.suscripcion.clientes.nombre_comercial.localeCompare(
       b.suscripcion.clientes.nombre_comercial,

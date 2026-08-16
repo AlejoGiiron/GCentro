@@ -23,12 +23,25 @@ import { SIN_COBERTURA, type Cobertura } from '@/lib/cobertura'
 
 const HOY = '2026-08-16'
 
+/**
+ * Cobertura con fecha calculable. Es el default de los tests de bandera
+ * porque `SIN_COBERTURA` ahora significa "no se puede calcular nada" (015) y
+ * atajaría todos los casos como `SIN_HISTORIAL` antes de llegar al que se
+ * quiere probar.
+ */
+const CON_HISTORIAL: Cobertura = {
+  cubierto_hasta: '2026-08-31',
+  ultimo_pago: '2026-08-01',
+  pagos_registrados: 1,
+  proximo_cobro: '2026-09-01',
+}
+
 /** `clasificar` con el contexto que no cambia en la mayoría de los casos. */
 const clasif = (
   sugerido: Nivel,
   b: EstadoBandera,
   estado: EstadoComercial = 'activa',
-  cobertura: Cobertura = SIN_COBERTURA,
+  cobertura: Cobertura = CON_HISTORIAL,
 ) => clasificar(sugerido, b, estado, cobertura, HOY)
 
 // ── Constructores mínimos ─────────────────────────────────────────────────
@@ -60,7 +73,6 @@ function fila(o: {
       precio_base_mensual: 80000,
       precio_sede_adicional: 60000,
       descuento_pct: 0,
-      proximo_cobro: o.cobro ?? '2026-09-01',
       periodo_actual_inicio: '2026-08-01',
       periodo_actual_fin: '2026-08-31',
       organizacion_externa_id: '12b53bae-a4f7-4076-80f9-8f9288bd0567',
@@ -71,6 +83,7 @@ function fila(o: {
     },
     montoCiclo: 80000,
     mensual: 80000,
+    proximo_cobro: o.cobro ?? '2026-09-01',
     sugerencia: { nivel: 'activa', dias_para_cobro: 30, regla: 'ACTIVA_CON_MARGEN' },
     bandera: nunca(),
     cobertura: SIN_COBERTURA,
@@ -148,7 +161,7 @@ describe('clasificar', () => {
     }
   })
 
-  it('las siete categorías son alcanzables: ninguna es código muerto', () => {
+  it('las ocho categorías son alcanzables: ninguna es código muerto', () => {
     const vistas = new Set<Atencion>()
     const banderas = [
       ...NIVELES.map((nv) => confirmada(nv)),
@@ -159,7 +172,8 @@ describe('clasificar', () => {
     const estados: EstadoComercial[] = ['activa', 'gracia', 'suspendida', 'cancelada']
     const cobs: Cobertura[] = [
       SIN_COBERTURA,
-      { cubierto_hasta: '2026-12-31', ultimo_pago: '2026-08-01', pagos_registrados: 1 },
+      CON_HISTORIAL,
+      { cubierto_hasta: '2026-12-31', ultimo_pago: '2026-08-01', pagos_registrados: 1, proximo_cobro: '2027-01-01' },
     ]
     for (const sugerido of NIVELES)
       for (const b of banderas)
@@ -177,14 +191,37 @@ describe('clasificar', () => {
       cubierto_hasta: '2026-12-31',
       ultimo_pago: '2026-08-01',
       pagos_registrados: 1,
+      proximo_cobro: '2027-01-01',
     }
     for (const b of [confirmada('suspendida'), confirmada('activa', 3), nunca(2), sinPuente()]) {
       expect(clasificar('activa', b, 'gracia', pago, HOY)).toBe('PAGO_SIN_REACTIVAR')
     }
   })
 
-  it('sin pago que cubra, el estado gracia no cambia nada', () => {
-    expect(clasificar('gracia', confirmada('gracia'), 'gracia', SIN_COBERTURA, HOY)).toBe('AL_DIA')
+  it('sin pago que cubra pero CON historial, gracia no cambia nada', () => {
+    const vencido: Cobertura = { ...CON_HISTORIAL, cubierto_hasta: '2026-07-31', proximo_cobro: '2026-08-01' }
+    expect(clasificar('gracia', confirmada('gracia'), 'gracia', vencido, HOY)).toBe('AL_DIA')
+  })
+
+  it('SIN NINGÚN pago registrado → SIN_HISTORIAL', () => {
+    // 015: la fecha se deriva de los pagos. Sin pagos no hay fecha, y eso no
+    // es "vence hoy" ni "nunca vence": es que no se sabe. Es el estado en que
+    // quedan G-10 y Salchimelo hasta que se les cargue el histórico real.
+    expect(clasificar('activa', confirmada('activa'), 'activa', SIN_COBERTURA, HOY)).toBe(
+      'SIN_HISTORIAL',
+    )
+  })
+
+  it('pero una bandera rota PESA MÁS que un dato que falta', () => {
+    // Un cliente restringido de más está sufriendo ahora; no saber su fecha
+    // de cobro es un punto ciego nuestro. El orden lo refleja.
+    expect(clasificar('activa', confirmada('suspendida'), 'activa', SIN_COBERTURA, HOY)).toBe(
+      'REGRESION_APLICADA',
+    )
+    expect(clasificar('activa', confirmada('activa', 2), 'activa', SIN_COBERTURA, HOY)).toBe(
+      'SIN_CONFIRMAR',
+    )
+    expect(clasificar('activa', sinPuente(), 'activa', SIN_COBERTURA, HOY)).toBe('SIN_PUENTE')
   })
 })
 
@@ -208,6 +245,7 @@ describe('perjudicar a quien pagó pesa más que no cobrarle a quien debe', () =
       'REGRESION_APLICADA',
       'SIN_CONFIRMAR',
       'SIN_PUENTE',
+      'SIN_HISTORIAL',
       'FALTA_ESCALAR',
       'POR_VENCER',
       'AL_DIA',
@@ -250,7 +288,7 @@ describe('aplicarVista', () => {
     // ninguno, y reordenar por prioridad rompe el recorrido.
     const r = aplicarVista(todas(), { ...base, vista: 'facturacion' })
     expect(nombres(r)).toEqual(['Escalar', 'Vence'])
-    expect(r[0].suscripcion.proximo_cobro < r[1].suscripcion.proximo_cobro).toBe(true)
+    expect(r[0].proximo_cobro! < r[1].proximo_cobro!).toBe(true)
   })
 
   it('«facturación» NO reordena por prioridad aunque una sea más grave', () => {

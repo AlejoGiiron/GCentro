@@ -29,6 +29,12 @@ export interface Cobertura {
   cubierto_hasta: FechaISO | null
   ultimo_pago: FechaISO | null
   pagos_registrados: number
+  /**
+   * El día siguiente al último cubierto (015). **`null` = no hay pagos con
+   * cobertura**, o sea que no se puede calcular — no "vence hoy" ni "nunca
+   * vence".
+   */
+  proximo_cobro: FechaISO | null
 }
 
 /** Sin ningún pago registrado. No es lo mismo que "pagó 0". */
@@ -36,6 +42,7 @@ export const SIN_COBERTURA: Cobertura = {
   cubierto_hasta: null,
   ultimo_pago: null,
   pagos_registrados: 0,
+  proximo_cobro: null,
 }
 
 /**
@@ -111,10 +118,7 @@ export function sugerirReactivacion(
   if (estado === 'activa') return { ofrecer: false, marcada: false, motivo: 'YA_ACTIVA' }
   if (estado === 'cancelada') return { ofrecer: false, marcada: false, motivo: 'CANCELADA' }
 
-  const cubre = estaCubierto(
-    { cubierto_hasta: cubreHasta, ultimo_pago: null, pagos_registrados: 0 },
-    hoy,
-  )
+  const cubre = estaCubierto({ ...SIN_COBERTURA, cubierto_hasta: cubreHasta }, hoy)
   return cubre
     ? { ofrecer: true, marcada: true, motivo: 'CUBIERTO_Y_RESTRINGIDO' }
     : { ofrecer: false, marcada: false, motivo: 'NO_ALCANZA' }

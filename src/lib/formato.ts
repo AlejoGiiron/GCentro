@@ -39,7 +39,9 @@ export function instante(iso: string): string {
  * "vence en 3 días" y "vencido hace 12 días" en vez de un número con signo:
  * el signo se lee mal de reojo, y esta columna se lee de reojo.
  */
-export function diasEnPalabras(dias: number): string {
+export function diasEnPalabras(dias: number | null): string {
+  // `null` = no hay historial de pagos (015). No es cero.
+  if (dias === null) return 'sin historial de pagos'
   if (dias === 0) return 'vence hoy'
   if (dias === 1) return 'vence mañana'
   if (dias > 1) return `en ${dias} días`

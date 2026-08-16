@@ -59,6 +59,7 @@ const ATENCION: Record<Atencion, { texto: string; clase: string }> = {
   REGRESION_APLICADA: { texto: 'restringe de más', clase: SENAL.critico },
   SIN_CONFIRMAR: { texto: 'sin confirmar', clase: SENAL.alerta },
   SIN_PUENTE: { texto: 'sin puente', clase: TINTA.media },
+  SIN_HISTORIAL: { texto: 'sin historial de pagos', clase: SENAL.info },
   FALTA_ESCALAR: { texto: 'falta escalar', clase: SENAL.info },
   POR_VENCER: { texto: 'vence pronto', clase: TINTA.media },
   AL_DIA: { texto: '', clase: '' },
@@ -170,10 +171,18 @@ function Fila({ f, abrir }: { f: FilaLista; abrir: (f: FilaLista) => void }) {
         <EstadoComercial estado={s.estado} />
       </td>
       <td className={`${TD} text-tinta-media`}>
-        {fecha(s.proximo_cobro)}
-        <div className="text-micro text-tinta-debil">
-          {diasEnPalabras(f.sugerencia.dias_para_cobro)}
-        </div>
+        {/* Derivado de los pagos (015). Sin historial no hay fecha, y se dice
+            en vez de mostrar una inventada. */}
+        {f.proximo_cobro ? (
+          <>
+            {fecha(f.proximo_cobro)}
+            <div className="text-micro text-tinta-debil">
+              {diasEnPalabras(f.sugerencia.dias_para_cobro)}
+            </div>
+          </>
+        ) : (
+          <span className="italic text-tinta-debil">sin calcular</span>
+        )}
       </td>
       <td className={`${TD} text-tinta-media`}>
         {f.sugerencia.nivel}

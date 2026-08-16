@@ -23,7 +23,6 @@ export const suscripcionListaSchema = z.object({
   precio_base_mensual: z.number().int(),
   precio_sede_adicional: z.number().int(),
   descuento_pct: z.number().int(),
-  proximo_cobro: z.string(),
   periodo_actual_inicio: z.string(),
   periodo_actual_fin: z.string(),
   organizacion_externa_id: z.string().uuid().nullable(),
@@ -103,6 +102,7 @@ export type UltimaConfirmada = z.infer<typeof ultimaConfirmadaSchema>
 export const coberturaSchema = z.object({
   suscripcion_id: z.string().uuid(),
   cubierto_hasta: z.string().nullable(),
+  proximo_cobro: z.string().nullable(),
   ultimo_pago: z.string().nullable(),
   // PostgREST devuelve `count(*)` como number.
   pagos_registrados: z.number().int(),

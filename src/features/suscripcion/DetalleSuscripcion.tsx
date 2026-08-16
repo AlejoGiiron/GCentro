@@ -429,9 +429,9 @@ export function DetalleSuscripcion({ fila, volver }: { fila: FilaLista; volver: 
         </span>
       </h1>
       <p className="mb-4 text-micro text-tinta-media">
-        Próximo cobro {fecha(s.proximo_cobro)}
-        {cobertura.cubierto_hasta && ` · pago hasta ${fecha(cobertura.cubierto_hasta)}`}
-        {!cobertura.cubierto_hasta && ' · sin pagos registrados'}
+        {cobertura.proximo_cobro
+          ? `Próximo cobro ${fecha(cobertura.proximo_cobro)} · pago hasta ${fecha(cobertura.cubierto_hasta!)}`
+          : 'Sin historial de pagos: no se puede calcular el próximo cobro'}
       </p>
 
       <div className="grid gap-4 xl:grid-cols-2">

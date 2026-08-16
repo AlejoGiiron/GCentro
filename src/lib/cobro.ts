@@ -120,7 +120,16 @@ export interface ResultadoCambio {
   monto_a_cobrar: number
   /** Solo en downgrade se corre. En upgrade queda igual. */
   periodo_actual_fin: FechaISO
-  proximo_cobro: FechaISO
+  /**
+   * ⚠️ SUGERENCIA, NO LA FUENTE. Desde `015` el `proximo_cobro` del panel se
+   * DERIVA de los pagos (`suscripcion_cobertura`) y no existe como columna.
+   *
+   * Esto es otra cosa: la fecha que resultaría del contrato después del
+   * cambio de plan, para mostrarla al decidirlo. Que un downgrade extienda el
+   * período no significa que la plata ya esté cobrada — lo segundo lo dice el
+   * pago, y sólo el pago mueve la fecha real.
+   */
+  proximo_cobro_sugerido: FechaISO
   mensual_anterior: number
   mensual_nuevo: number
 }
@@ -163,7 +172,7 @@ export function calcularCambioDePlan(
     saldo_a_favor: saldo,
     monto_a_cobrar: 0,
     periodo_actual_fin: periodo.periodo_actual_fin,
-    proximo_cobro: aISO(addDays(dia(periodo.periodo_actual_fin), 1)),
+    proximo_cobro_sugerido: aISO(addDays(dia(periodo.periodo_actual_fin), 1)),
     mensual_anterior: mensualAnterior,
     mensual_nuevo: mensualNuevo,
   }
@@ -206,7 +215,7 @@ export function calcularCambioDePlan(
     ...base,
     tipo: 'downgrade',
     periodo_actual_fin: nuevoFin,
-    proximo_cobro: aISO(addDays(dia(nuevoFin), 1)),
+    proximo_cobro_sugerido: aISO(addDays(dia(nuevoFin), 1)),
   }
 }
 
