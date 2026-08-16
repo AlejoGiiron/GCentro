@@ -95,6 +95,17 @@ pantalla nueva que dependa de un contexto —router, provider— suma el suyo.
 test pasaba con y sin el bug: la regresión se probó introduciéndola a mano.
 Si un test no se vio fallar, no se sabe qué prueba.
 
+**Cubrir por COBERTURA en vez de por MODO DE FALLO produce verde falso.** Un
+`renderToString` sobre `LoginPage` daría verde sin tocar ninguno de sus modos
+de fallo reales —el deadlock de `onAuthStateChange`, los factores TOTP
+huérfanos—, porque los dos viven en efectos y `renderToString` no corre
+efectos. Ese test no sería neutral: sería peor que no tenerlo, porque deja la
+impresión de que la pantalla está probada. Es la misma familia que el test
+vacuo del Router.
+
+Antes de escribir un test, nombrar **qué modo de fallo concreto atrapa**. Si
+la respuesta es "que exista", no se escribe.
+
 **Impeccable detecta slop visual, NO accesibilidad.** Sus 58 reglas estáticas
 buscan gradientes, glows, paletas de IA y jerga de marketing. Contraste,
 tamaño de texto y largo de línea existen pero **necesitan el pase de
