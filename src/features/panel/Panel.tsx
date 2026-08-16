@@ -17,9 +17,9 @@ function Marco({ children }: { children: React.ReactNode }) {
           <span className="text-sm font-semibold tracking-tight text-slate-200">G-Centro</span>
           <button
             onClick={() => void supabase.auth.signOut()}
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300"
+            className="inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-xs text-slate-400 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950"
           >
-            <LogOut size={13} />
+            <LogOut size={13} aria-hidden="true" />
             Cerrar sesión
           </button>
         </div>
@@ -35,7 +35,7 @@ export function Panel() {
   if (isLoading) {
     return (
       <Marco>
-        <p className="text-sm text-slate-500">Verificando acceso…</p>
+        <p className="text-sm text-slate-400">Verificando acceso…</p>
       </Marco>
     )
   }

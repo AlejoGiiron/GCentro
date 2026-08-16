@@ -138,6 +138,8 @@ export interface Filtros {
   busqueda: string
   /** `suscripciones.estado`, o `''` para todos. */
   estado: string
+  /** Los tenants de laboratorio se ocultan por default (§3). */
+  mostrarPrueba: boolean
 }
 
 /** Sin tildes y en minúsculas: buscar "salchimelo" tiene que encontrar "Salchimeló". */
@@ -154,6 +156,7 @@ export function aplicarVista(filas: FilaLista[], f: Filtros): FilaLista[] {
   const q = normalizar(f.busqueda)
 
   const visibles = filas.filter((fila) => {
+    if (!f.mostrarPrueba && fila.suscripcion.clientes.es_prueba) return false
     // ⚠️ La búsqueda NO se filtra por vista. Buscar un cliente que está al día
     // desde la vista "hoy" tiene que encontrarlo: si no, la caja de búsqueda
     // devuelve vacío por una razón que no se ve en pantalla.
@@ -190,8 +193,31 @@ export function aplicarVista(filas: FilaLista[], f: Filtros): FilaLista[] {
   )
 }
 
-/** Cuántas filas necesitan atención hoy. Se muestra aunque la vista sea otra. */
-export function contarAtencion(filas: FilaLista[]): number {
+/**
+ * Cuánto necesita atención, separando lo visible de lo escondido.
+ *
+ * ⚠️ `ocultos` existe porque un contador que cuenta sobre datos ya filtrados
+ * MIENTE. Con LAB roto y el interruptor de prueba apagado, la versión anterior
+ * decía "0" y el estado vacío decía "nada que atender" — afirmando sobre un
+ * conjunto que no había mirado. Es el modo de fallo silencioso que este
+ * proyecto evita en todos lados, puesto en el texto que más confianza da.
+ *
+ * Ahora la pantalla puede decir "nada entre los que facturan, y hay 1
+ * escondido", que es la verdad completa.
+ */
+export interface Atencionados {
+  /** Necesitan atención y se están mostrando. */
+  visibles: number
+  /** Necesitan atención pero el interruptor de prueba los está ocultando. */
+  ocultos: number
+}
+
+export function contarAtencion(filas: FilaLista[], mostrarPrueba: boolean): Atencionados {
   const urgentes = ATENCION_DE_VISTA.hoy!
-  return filas.filter((f) => urgentes.includes(f.atencion)).length
+  const necesitan = filas.filter((f) => urgentes.includes(f.atencion))
+  if (mostrarPrueba) return { visibles: necesitan.length, ocultos: 0 }
+  return {
+    visibles: necesitan.filter((f) => !f.suscripcion.clientes.es_prueba).length,
+    ocultos: necesitan.filter((f) => f.suscripcion.clientes.es_prueba).length,
+  }
 }

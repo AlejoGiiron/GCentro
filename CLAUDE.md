@@ -84,6 +84,16 @@ Corolario: **lo que no se puede correr en un test no lleva decisiones adentro.**
 `supabase/functions/*/index.ts` son adaptadores de Deno; la lógica va en
 `_shared/`, que corre en vitest.
 
+**Impeccable detecta slop visual, NO accesibilidad.** Sus 58 reglas estáticas
+buscan gradientes, glows, paletas de IA y jerga de marketing. Contraste,
+tamaño de texto y largo de línea existen pero **necesitan el pase de
+navegador**, que pide `puppeteer` y, acá, además tropieza con el login + TOTP.
+
+**Un cero de Impeccable no es evidencia de nada.** Comprobado el 16/08/2026:
+un archivo de control con `div` clickeable, `img` sin alt, input sin label y
+gris sobre gris también dio cero. Si el reporte dice "sin hallazgos", verificar
+con un control antes de creerle — y la accesibilidad se audita a mano igual.
+
 ### 5. Antes de decir "esto viene heredado de otro repo", verificarlo ahí
 
 Afirmar que un bug, un patrón o una decisión viene de G-Vento (o de G-Quota, o

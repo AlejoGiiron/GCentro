@@ -2,20 +2,31 @@
  * La consulta de la lista, más la derivación de las DOS columnas de §5.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POR QUÉ LA EXCLUSIÓN DE LAB ACÁ ES UN FILTRO Y NO LA VISTA `*_cobrables`
+ * TRES CONSULTAS ACOTADAS, NINGUNA QUE CREZCA SIN TECHO
  *
- * §3 dice que la exclusión de los tenants de prueba va por vistas, para que
- * sea el default y no algo que cada consulta tenga que acordarse de escribir.
- * Eso vale para lo que SUMA PLATA: un total de cobranza inflado con datos de
- * prueba falla del lado silencioso.
+ * §5: la cola de banderas crece por LLAMADA, no por cambio de estado. Traerla
+ * entera para derivar "la última de cada suscripción" era barato con 8 filas y
+ * dejaba de serlo con 50 clientes sincronizando a diario.
  *
- * Esta pantalla no suma nada: lista. Y necesita poder MOSTRAR LAB cuando el
- * interruptor está encendido, cosa que una vista que lo excluye no permite.
- * Acá la exclusión es visible en la UI —hay un interruptor apagado— en vez de
- * estar olvidada en un WHERE, que era el modo de fallo que preocupaba.
+ *   · suscripciones                → acotada por la cantidad de contratos.
+ *   · bandera_ultima_confirmada    → una fila por suscripción (vista, 011).
+ *   · banderas sin confirmar       → el backlog del outbox, acotado por
+ *                                    diseño. Si crece, ESO ES LA ALARMA.
  *
- * La regla queda así: **lo que suma plata lee `*_cobrables`; lo que lista
- * filtra explícito y muestra el interruptor.**
+ * ─────────────────────────────────────────────────────────────────────────
+ * LOS TENANTS DE PRUEBA SE TRAEN SIEMPRE Y SE OCULTAN AL MOSTRAR
+ *
+ * Antes el filtro iba en la consulta. Eso hacía que el contador de "necesita
+ * atención" contara sobre datos ya filtrados: **con LAB roto y el interruptor
+ * apagado, la pantalla decía que no había nada que atender.** Es el modo de
+ * fallo silencioso que el proyecto evita en todos lados, puesto justo en el
+ * texto que más confianza transmite.
+ *
+ * Trayéndolos siempre, el contador es honesto y la vista puede avisar que hay
+ * algo escondido. De paso, alternar el interruptor ya no refetchea.
+ *
+ * §3 sigue en pie: **lo que SUMA PLATA lee las vistas `*_cobrables`.** Esto
+ * lista y cuenta; no suma.
  * ─────────────────────────────────────────────────────────────────────────
  */
 import { useQuery } from '@tanstack/react-query'
@@ -26,10 +37,27 @@ import { hoyISO } from '@/lib/formato'
 import {
   banderaSchema,
   suscripcionListaSchema,
+  ultimaConfirmadaSchema,
   type Bandera,
   type SuscripcionLista,
+  type UltimaConfirmada,
 } from './schemas'
 import { clasificar, type EstadoBandera, type FilaLista } from './vista'
+
+/**
+ * ⚠️ PENDIENTE DE REGENERAR TIPOS (marcador: TIPOS-011).
+ *
+ * `bandera_ultima_confirmada` la crea la migración `011`, que todavía no está
+ * aplicada, así que `database.types.ts` no la conoce y `supabase.from()` no la
+ * acepta como nombre válido.
+ *
+ * El cast es sobre el NOMBRE de la relación, no sobre la forma de los datos:
+ * `ultimaConfirmadaSchema` valida la respuesta en runtime, que es la garantía
+ * que de verdad importa (regla 3: los tipos no se escriben a mano).
+ *
+ * Se saca en cuanto se corra `supabase gen types typescript --linked`.
+ */
+const VISTA_ULTIMA_CONFIRMADA = 'bandera_ultima_confirmada' as 'clientes_cobrables'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
@@ -41,58 +69,58 @@ const SELECT = `
   terminos!inner ( codigo, meses )
 `
 
-function derivarBandera(s: SuscripcionLista, propias: Bandera[]): EstadoBandera {
+function derivarBandera(
+  s: SuscripcionLista,
+  confirmada: UltimaConfirmada | undefined,
+  pendientes: Bandera[],
+): EstadoBandera {
   if (!s.organizacion_externa_id || !s.productos.url_aplicar_estado) {
     return { clase: 'sin_puente', sinConfirmar: 0 }
   }
 
-  // `propias` viene ordenada de más nueva a más vieja.
-  const confirmada = propias.find((b) => b.confirmado_en !== null)
-  const sinConfirmar = propias.filter((b) => b.confirmado_en === null)
-
   if (!confirmada) {
     return {
       clase: 'nunca',
-      sinConfirmar: sinConfirmar.length,
-      ultimoCodigo: sinConfirmar[0]?.bandera_error_codigo,
+      sinConfirmar: pendientes.length,
+      ultimoCodigo: pendientes[0]?.bandera_error_codigo,
     }
   }
 
   return {
     clase: 'confirmada',
     nivel: confirmada.valor_deseado,
-    desde: confirmada.confirmado_en ?? undefined,
+    desde: confirmada.confirmado_en,
     cambioEfectivo: confirmada.cambio_efectivo,
-    sinConfirmar: sinConfirmar.length,
-    ultimoCodigo: sinConfirmar[0]?.bandera_error_codigo,
+    sinConfirmar: pendientes.length,
+    ultimoCodigo: pendientes[0]?.bandera_error_codigo,
   }
 }
 
-export function useSuscripciones(mostrarPrueba: boolean) {
+export function useSuscripciones() {
   return useQuery({
-    queryKey: ['suscripciones', mostrarPrueba],
+    // Sin `mostrarPrueba` en la clave: el interruptor es de presentación, no
+    // de datos. Alternarlo no vuelve a pedir nada.
+    queryKey: ['suscripciones'],
     queryFn: async (): Promise<FilaLista[]> => {
-      let consulta = supabase.from('suscripciones').select(SELECT)
-      if (!mostrarPrueba) {
-        // El filtro va sobre el embed `!inner`, así que descarta la fila
-        // entera y no solo el objeto anidado.
-        consulta = consulta.eq('clientes.es_prueba', false)
-      }
-
-      const [suscripciones, banderas] = await Promise.all([
-        consulta,
+      const [suscripciones, confirmadas, pendientes] = await Promise.all([
+        supabase.from('suscripciones').select(SELECT),
+        supabase.from(VISTA_ULTIMA_CONFIRMADA).select('*'),
         supabase
           .from('banderas_pendientes')
           .select('*')
+          .is('confirmado_en', null)
           .order('creado_en', { ascending: false }),
       ])
 
       if (suscripciones.error) throw suscripciones.error
-      if (banderas.error) throw banderas.error
+      if (confirmadas.error) throw confirmadas.error
+      if (pendientes.error) throw pendientes.error
 
       const filas = suscripcionListaSchema.array().parse(suscripciones.data)
-      const todasLasBanderas = banderaSchema.array().parse(banderas.data)
+      const ultimas = ultimaConfirmadaSchema.array().parse(confirmadas.data)
+      const sinConfirmar = banderaSchema.array().parse(pendientes.data)
 
+      const porSuscripcion = new Map(ultimas.map((u) => [u.suscripcion_id, u]))
       const hoy = hoyISO()
 
       return filas
@@ -108,7 +136,8 @@ export function useSuscripciones(mostrarPrueba: boolean) {
           const sugerencia = nivelSugerido(s.estado, s.proximo_cobro, hoy)
           const bandera = derivarBandera(
             s,
-            todasLasBanderas.filter((b) => b.suscripcion_id === s.id),
+            porSuscripcion.get(s.id),
+            sinConfirmar.filter((b) => b.suscripcion_id === s.id),
           )
 
           return {
@@ -127,5 +156,9 @@ export function useSuscripciones(mostrarPrueba: boolean) {
           ),
         )
     },
+    // La tabla no desaparece mientras se refresca: sin esto, cualquier
+    // invalidación deja la pantalla en blanco un instante y el operador
+    // pierde de vista la fila que estaba mirando.
+    placeholderData: (anterior) => anterior,
   })
 }

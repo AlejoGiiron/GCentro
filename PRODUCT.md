@@ -74,6 +74,13 @@ positivo acá es un negocio que no puede operar.
   restricción (`activa`/`por_vencer`/`gracia`/`restringida`/`suspendida`) son **dos
   vocabularios distintos** que es fácil confundir.
 
+**Solo escritorio.** El panel se usa sentado, en un monitor, con teclado. No hay caso de
+uso móvil: la tanda mensual de facturación es una sesión larga con una tabla ancha, y el
+vistazo diario también ocurre frente a la computadora. **Los blancos táctiles chicos y la
+densidad alta son decisiones, no defectos** — una auditoría responsive que los marque
+está midiendo contra un dispositivo que nadie usa acá. Lo que sí se exige es que la
+pantalla no se rompa si la ventana es angosta.
+
 **Restricciones duras:**
 
 - Deny-by-default en toda la base: sin fila en `admins` no se lee absolutamente nada.

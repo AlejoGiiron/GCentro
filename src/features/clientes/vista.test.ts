@@ -194,7 +194,7 @@ describe('aplicarVista', () => {
     fila({ nombre: 'Pendiente', atencion: 'SIN_CONFIRMAR' }),
     fila({ nombre: 'Regresion', atencion: 'REGRESION_APLICADA' }),
   ]
-  const base = { busqueda: '', estado: '' }
+  const base = { busqueda: '', estado: '', mostrarPrueba: true }
   const nombres = (f: FilaLista[]) => f.map((x) => x.suscripcion.clientes.nombre_comercial)
 
   it('«hoy» muestra sólo las tres primeras categorías, lo peor arriba', () => {
@@ -255,29 +255,79 @@ describe('búsqueda', () => {
   it('IGNORA la vista: encuentra algo al día desde «hoy»', () => {
     // Si respetara la vista, la caja devolvería vacío por una razón que no se
     // ve en pantalla — y el usuario concluiría que el cliente no existe.
-    expect(nombres(aplicarVista(filas, { vista: 'hoy', busqueda: 'salchi', estado: '' }))).toEqual([
+    expect(nombres(aplicarVista(filas, { vista: 'hoy', busqueda: 'salchi', estado: '', mostrarPrueba: true }))).toEqual([
       'Salchimeló',
     ])
   })
 
   it('ignora tildes y mayúsculas', () => {
     for (const q of ['SALCHIMELO', 'salchimeló', 'Salchimelo']) {
-      expect(aplicarVista(filas, { vista: 'todas', busqueda: q, estado: '' })).toHaveLength(1)
+      expect(aplicarVista(filas, { vista: 'todas', busqueda: q, estado: '', mostrarPrueba: true })).toHaveLength(1)
     }
   })
 
   it('también busca por producto', () => {
-    expect(nombres(aplicarVista(filas, { vista: 'todas', busqueda: 'g-mura', estado: '' }))).toEqual([
+    expect(nombres(aplicarVista(filas, { vista: 'todas', busqueda: 'g-mura', estado: '', mostrarPrueba: true }))).toEqual([
       'Otro',
     ])
   })
 
   it('sin coincidencias devuelve vacío, no todo', () => {
-    expect(aplicarVista(filas, { vista: 'todas', busqueda: 'zzz', estado: '' })).toHaveLength(0)
+    expect(aplicarVista(filas, { vista: 'todas', busqueda: 'zzz', estado: '', mostrarPrueba: true })).toHaveLength(0)
   })
 
   it('el filtro de estado se aplica junto con la búsqueda', () => {
-    const r = aplicarVista(filas, { vista: 'todas', busqueda: '', estado: 'gracia' })
+    const r = aplicarVista(filas, { vista: 'todas', busqueda: '', estado: 'gracia', mostrarPrueba: true })
+    expect(r).toHaveLength(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EL CONTADOR NO PUEDE AFIRMAR SOBRE LO QUE NO MIRÓ
+// ═══════════════════════════════════════════════════════════════════════════
+describe('los tenants de prueba se ocultan sin desaparecer del conteo', () => {
+  const conLab = (): FilaLista[] => {
+    const normal = fila({ nombre: 'G-10', atencion: 'AL_DIA' })
+    const lab = fila({ nombre: 'LAB', atencion: 'REGRESION_APLICADA' })
+    lab.suscripcion.clientes.es_prueba = true
+    return [normal, lab]
+  }
+
+  it('con el interruptor apagado LAB no se lista', () => {
+    const r = aplicarVista(conLab(), {
+      vista: 'todas',
+      busqueda: '',
+      estado: '',
+      mostrarPrueba: false,
+    })
+    expect(r.map((x) => x.suscripcion.clientes.nombre_comercial)).toEqual(['G-10'])
+  })
+
+  it('pero el contador lo reporta como OCULTO, no como inexistente', () => {
+    // El bug de la auditoría del 16/08: con LAB roto y el interruptor apagado,
+    // la pantalla decía "nada que atender". Afirmaba sobre un conjunto que no
+    // había mirado — el modo de fallo silencioso que el proyecto evita.
+    expect(contarAtencion(conLab(), false)).toEqual({ visibles: 0, ocultos: 1 })
+  })
+
+  it('con el interruptor encendido pasa a visible y no queda oculto nada', () => {
+    expect(contarAtencion(conLab(), true)).toEqual({ visibles: 1, ocultos: 0 })
+  })
+
+  it('un tenant de prueba SIN problemas no se anuncia como oculto', () => {
+    const lab = fila({ nombre: 'LAB', atencion: 'AL_DIA' })
+    lab.suscripcion.clientes.es_prueba = true
+    expect(contarAtencion([lab], false)).toEqual({ visibles: 0, ocultos: 0 })
+  })
+
+  it('la búsqueda tampoco resucita un tenant de prueba oculto', () => {
+    // Si no, el interruptor sería una sugerencia y no un filtro.
+    const r = aplicarVista(conLab(), {
+      vista: 'todas',
+      busqueda: 'LAB',
+      estado: '',
+      mostrarPrueba: false,
+    })
     expect(r).toHaveLength(0)
   })
 })
@@ -292,10 +342,10 @@ describe('contarAtencion', () => {
       fila({ atencion: 'POR_VENCER' }),
       fila({ atencion: 'AL_DIA' }),
     ]
-    expect(contarAtencion(filas)).toBe(3)
+    expect(contarAtencion(filas, true)).toEqual({ visibles: 3, ocultos: 0 })
   })
 
   it('cero cuando no hay nada que atender', () => {
-    expect(contarAtencion([fila({ atencion: 'AL_DIA' })])).toBe(0)
+    expect(contarAtencion([fila({ atencion: 'AL_DIA' })], true)).toEqual({ visibles: 0, ocultos: 0 })
   })
 })

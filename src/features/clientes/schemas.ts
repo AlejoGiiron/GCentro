@@ -70,3 +70,24 @@ export const banderaSchema = z.object({
 })
 
 export type Bandera = z.infer<typeof banderaSchema>
+
+/**
+ * Fila de la vista `bandera_ultima_confirmada` (migración 011): la última
+ * bandera que el producto confirmó, una por suscripción.
+ *
+ * Es un schema aparte y más chico a propósito. La vista no trae `ultimo_error`
+ * ni `intentos` porque en una fila confirmada no significan nada —el error se
+ * limpió y los intentos ya se consumieron—, y declararlos acá invitaría a
+ * mostrarlos como si fueran el estado actual.
+ */
+export const ultimaConfirmadaSchema = z.object({
+  suscripcion_id: z.string().uuid(),
+  id: z.string().uuid(),
+  valor_deseado: z.enum(NIVELES),
+  cambio_efectivo: z.boolean().nullable(),
+  // En la vista nunca es null: la definición filtra `confirmado_en is not null`.
+  confirmado_en: z.string(),
+  admin_id: z.string().uuid().nullable(),
+})
+
+export type UltimaConfirmada = z.infer<typeof ultimaConfirmadaSchema>
