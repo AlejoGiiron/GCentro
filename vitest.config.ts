@@ -18,6 +18,12 @@ export default defineConfig({
       'supabase/functions/_shared/**/*.{test,spec}.ts',
     ],
     environment: 'node',
+    // El cliente de Supabase se construye al importar y exige URL y clave.
+    // Son valores de juguete: ningún test toca la red.
+    env: {
+      VITE_GCENTRO_SUPABASE_URL: 'http://localhost:54321',
+      VITE_GCENTRO_SUPABASE_ANON_KEY: 'clave-de-prueba',
+    },
   },
   resolve: {
     alias: {

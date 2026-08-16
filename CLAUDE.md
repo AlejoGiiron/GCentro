@@ -84,6 +84,17 @@ Corolario: **lo que no se puede correr en un test no lleva decisiones adentro.**
 `supabase/functions/*/index.ts` son adaptadores de Deno; la lógica va en
 `_shared/`, que corre en vitest.
 
+**Un componente que nunca se renderiza en un test no está probado.** Pasó el
+16/08/2026: la app reventaba al cargar el 100% de las veces —`NavLink` fuera
+del `Router`— con 513 tests en verde y typecheck, lint y build limpios.
+Ninguno montaba un componente. Hay un humo mínimo en
+`src/features/panel/Panel.test.tsx` (`renderToString` sobre `jsdom`); toda
+pantalla nueva que dependa de un contexto —router, provider— suma el suyo.
+
+**Y el test tiene que fallar sin el arreglo.** El primer intento de ese mismo
+test pasaba con y sin el bug: la regresión se probó introduciéndola a mano.
+Si un test no se vio fallar, no se sabe qué prueba.
+
 **Impeccable detecta slop visual, NO accesibilidad.** Sus 58 reglas estáticas
 buscan gradientes, glows, paletas de IA y jerga de marketing. Contraste,
 tamaño de texto y largo de línea existen pero **necesitan el pase de
