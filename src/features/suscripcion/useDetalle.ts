@@ -20,7 +20,7 @@ import { eventoSchema, pagoSchema, type FormularioPago } from './schemas'
 import type { EstadoComercial } from '@/lib/bandera'
 
 /**
- * ⚠️ PENDIENTE DE REGENERAR TIPOS (marcador: TIPOS-011).
+ * ⚠️ PENDIENTE DE REGENERAR TIPOS (marcador: TIPOS-013).
  *
  * La RPC la crea la migración `013`, que todavía no está aplicada. El cast es
  * sobre el NOMBRE, no sobre los argumentos ni el resultado: los argumentos se

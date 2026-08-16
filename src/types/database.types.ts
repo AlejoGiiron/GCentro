@@ -473,6 +473,39 @@ export type Database = {
       }
     }
     Views: {
+      bandera_ultima_confirmada: {
+        Row: {
+          admin_id: string | null
+          cambio_efectivo: boolean | null
+          confirmado_en: string | null
+          id: string | null
+          suscripcion_id: string | null
+          valor_deseado: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banderas_pendientes_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banderas_pendientes_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banderas_pendientes_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones_cobrables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes_cobrables: {
         Row: {
           contacto_email: string | null
