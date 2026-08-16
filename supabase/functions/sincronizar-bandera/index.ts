@@ -30,6 +30,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { CORS, respuestaPreflight } from '../_shared/cors.ts'
 import { enviarBandera } from '../_shared/enviar.ts'
 import {
   sincronizarBandera,
@@ -44,11 +45,17 @@ type Handler = (peticion: Request) => Promise<Response>
 function json(cuerpo: unknown, status: number): Response {
   return new Response(JSON.stringify(cuerpo), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    // CORS en TODAS las respuestas, no sólo en el preflight: sin esto el
+    // navegador deja pasar el OPTIONS y después bloquea la respuesta del POST.
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 }
 
 Deno.serve(async (peticion) => {
+  // El preflight va PRIMERO: llega sin `Authorization` a propósito, así que
+  // cualquier chequeo previo lo rechazaría y el navegador bloquearía el POST.
+  if (peticion.method === 'OPTIONS') return respuestaPreflight()
+
   if (peticion.method !== 'POST') {
     return json({ error: 'Solo POST.' }, 405)
   }

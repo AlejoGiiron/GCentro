@@ -1250,6 +1250,12 @@ de las tablas, y no pasa por RLS — un `select` suelto ahí muestra todo y no p
 > un documento que describe una intención con la misma voz que un hecho es exactamente lo
 > que lleva a descubrir el problema el día que hace falta el respaldo.
 >
+> **Las migraciones sí son reproducibles desde el 16/08**: los 15 archivos viven en
+> `supabase/migrations/` con el formato del CLI y el historial remoto quedó marcado como
+> aplicado. `db push --dry-run` dice que la base está al día, así que se puede levantar
+> un entorno nuevo desde cero. Eso cubre "reproducir el esquema", **no** "recuperar los
+> datos" — que es lo que sigue faltando.
+>
 > **Falta: sumar esta base al ciclo de backup nocturno ya montado, y verificar una
 > restauración.** Un backup que nunca se restauró no se sabe si es un backup.
 >
