@@ -24,7 +24,7 @@ import { filaColaSchema, type FilaCola } from './schemas'
 
 const SELECT = `
   id, suscripcion_id, valor_deseado, intentos, ultimo_error,
-  bandera_error_codigo, cambio_efectivo, confirmado_en, creado_en, admin_id,
+  bandera_error_codigo, cambio_efectivo, confirmado_en, creado_en, admin_id, mensaje,
   admins ( email ),
   suscripciones!inner ( clientes!inner ( nombre_comercial, es_prueba ) )
 `
@@ -99,10 +99,11 @@ export function useReintentar() {
         body: {
           suscripcion_id: f.suscripcion_id,
           valor_deseado: f.valor_deseado,
-          // El mensaje del banner NO se reintenta: no quedó guardado en la
-          // fila (§3 no lo persiste) y reenviar `null` lo borraría del
-          // producto. Reintentar aplica el NIVEL, que es lo que falló.
-          mensaje: null,
+          // ⚠️ SE REENVÍA EL MENSAJE ORIGINAL (014). Antes iba `null` porque
+          // el texto no se guardaba, y eso BORRABA el banner del producto: un
+          // reintento exitoso dejaba al cliente con el nivel correcto y sin la
+          // explicación. Un reintento repite la intención COMPLETA.
+          mensaje: f.mensaje,
         },
       })
       if (error) throw error

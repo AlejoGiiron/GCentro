@@ -327,7 +327,8 @@ Cola de escritura hacia los productos. Ver §5.
 
 `id` · `suscripcion_id` fk · `valor_deseado` `text` · `intentos` `smallint` ·
 `ultimo_error` `text` · `bandera_error_codigo` `text` · `cambio_efectivo` `boolean`
-nullable · `confirmado_en` `timestamptz` nullable · `admin_id` fk nullable · `creado_en`
+nullable · `mensaje` `text` nullable · `confirmado_en` `timestamptz` nullable ·
+`admin_id` fk nullable · `creado_en`
 
 `cambio_efectivo` es el `changed` de la respuesta, guardado de este lado y en español
 porque es columna nuestra (§2). **El null significa algo:** `confirmado_en` lleno con
@@ -966,6 +967,67 @@ Por eso las plantillas por nivel son **requisito, no adorno**, y por eso el edit
 que dejar personalizar sobre la plantilla en vez de obligar a elegir entre plantilla y
 texto propio. El caso que hay que soportar es "la de siempre, más una frase para este
 cliente" — que es como se escribe una cobranza de verdad.
+
+#### Las plantillas viven en el código, y por qué
+
+En `src/lib/plantillas.ts`, como `Record<Nivel, Plantilla>`.
+
+La alternativa era una tabla, y se descartó por una razón que no es la obvia: **una tabla
+sin pantalla de edición no mejora nada.** Mueve el cambio de "un dev despliega" a "alguien
+abre el SQL Editor", que para un operador no técnico es peor y más riesgoso. Y una
+pantalla de edición de plantillas es otra pantalla.
+
+Los dos argumentos que la sostienen:
+
+- **La plantilla es un punto de partida, no el texto final.** El campo queda editable, así
+  que el costo del despliegue aplica sólo a cambiar el *default*, no a mandar un texto
+  distinto — que es el caso frecuente.
+- **`Record<Nivel, Plantilla>` hace que un nivel sin plantilla no compile**, igual que la
+  traducción de §6. En una tabla eso es, con suerte, un CHECK.
+
+**Cuándo mudarlas a la base:** cuando alguien pida cambiar la redacción por segunda o
+tercera vez, o cuando un operador no técnico necesite hacerlo.
+
+#### Reglas de redacción, que no son de estilo
+
+El mensaje es **el único texto de todo el proyecto que lee alguien que no es un operador
+de Giiron**: el cajero de un bar, en el mostrador, con clientes esperando. No eligió estar
+ahí, no sabe qué es G-Centro, y probablemente no sea quien decide si se paga.
+
+- **Nunca acusa al que lee.** "Tu cuenta está vencida" le habla a alguien que no está en
+  el mostrador.
+- **Dice qué hacer y a quién buscar.** Un banner que informa un problema sin salida sólo
+  genera una llamada de alguien que no puede resolverlo.
+- **Nunca amenaza con bloquear lo que no se bloquea.** §6 garantiza que vender, cobrar,
+  facturar a la DIAN y exportar no se bloquean nunca. Decir lo contrario es mentir, y la
+  mentira se descubre en el peor momento posible.
+
+#### El mensaje se guarda (`014`), y eso arregla el reintento
+
+`banderas_pendientes.mensaje` guarda el texto que se envió. Contesta "¿qué le dijimos a
+este cliente y cuándo?", que con varios operadores no tenía respuesta.
+
+**Y corrige algo que estaba documentado como decisión y no lo era.** El código decía que
+reintentar no reenvía el mensaje; en realidad no podía, porque el texto no se guardaba. Y
+reenviar `null` **borra el banner del producto**: un reintento exitoso dejaba al cliente
+con el nivel correcto y sin la explicación. Ahora el reintento repite la intención
+completa.
+
+El `null` de esa columna es **ambiguo en las filas anteriores** —"no quedó registro"— y
+unívoco en las nuevas —"se envió sin mensaje"—. La pantalla las separa por fecha; el
+histórico no se rellena.
+
+#### La previsualización se ve como G-Vento, no como G-Centro
+
+Es la única parte del panel que representa otro producto. Con los tokens de acá, el
+operador juzgaría el contraste y el peso del banner contra un fondo oscuro que en el POS
+no existe.
+
+**Es una aproximación y la pantalla lo dice.** No se puede abrir el repo de G-Vento
+(regla 2), así que reproduce la FORMA —franja de ancho completo, arriba de la pantalla de
+venta, sobre fondo claro, con el trabajo empujado hacia abajo— y no sus colores exactos.
+Prometer fidelidad sin haberla verificado sería la clase de afirmación que este documento
+existe para evitar.
 
 ### Gating solo en la UI
 

@@ -49,6 +49,7 @@ function puertoFalso(opciones: {
 } = {}) {
   const bitacora: string[] = []
   const cierres: Array<{ id: string; campos: CamposCierre }> = []
+  const creadasCon: Array<{ nivel: string; mensaje: string | null }> = []
   let creadas = 0
 
   const datos: PuertoDatos = {
@@ -60,8 +61,9 @@ function puertoFalso(opciones: {
       bitacora.push('buscarSuscripcion')
       return opciones.suscripcion === undefined ? { ...SUSCRIPCION_OK, id } : opciones.suscripcion
     },
-    async crearBandera() {
+    async crearBandera(_id, nivel, mensaje) {
       bitacora.push('crearBandera')
+      creadasCon.push({ nivel, mensaje })
       creadas++
       return `bandera-${creadas}`
     },
@@ -75,6 +77,7 @@ function puertoFalso(opciones: {
     datos,
     bitacora,
     cierres,
+    creadasCon,
     get creadas() {
       return creadas
     },
@@ -357,6 +360,31 @@ describe('el handler y el envío encajan', () => {
       e.enviar,
     )
     expect(e.recibidos[0].mensaje).toBe('Pago pendiente.')
+  })
+
+  it('el mensaje se GUARDA en la fila, no sólo se envía', async () => {
+    // 014. Antes se perdía, y por eso reintentar mandaba `null` — que en el
+    // producto BORRA el banner. Guardarlo es lo que permite que un reintento
+    // repita la intención completa.
+    const p = puertoFalso()
+    const e = envioFalso()
+    await sincronizarBandera(entradaBuena, SECRETO, p.datos, e.enviar)
+    expect(p.creadasCon[0]).toEqual({ nivel: 'gracia', mensaje: 'Prueba de laboratorio.' })
+  })
+
+  it('lo que se guarda es lo mismo que se envía, normalizado', async () => {
+    // Si divergieran, el historial diría una cosa y el cliente habría visto
+    // otra — que es peor que no guardar nada.
+    const p = puertoFalso()
+    const e = envioFalso()
+    await sincronizarBandera(
+      { ...entradaBuena, mensaje: '   Pago pendiente.   ' },
+      SECRETO,
+      p.datos,
+      e.enviar,
+    )
+    expect(p.creadasCon[0].mensaje).toBe('Pago pendiente.')
+    expect(e.recibidos[0].mensaje).toBe(p.creadasCon[0].mensaje)
   })
 
   it('un mensaje vacío llega como null', async () => {

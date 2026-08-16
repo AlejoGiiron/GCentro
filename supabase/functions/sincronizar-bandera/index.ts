@@ -113,10 +113,10 @@ Deno.serve(async (peticion) => {
       }
     },
 
-    async crearBandera(suscripcionId, nivel) {
+    async crearBandera(suscripcionId, nivel, mensaje) {
       const { data, error } = await supabase
         .from('banderas_pendientes')
-        .insert({ suscripcion_id: suscripcionId, valor_deseado: nivel })
+        .insert({ suscripcion_id: suscripcionId, valor_deseado: nivel, mensaje })
         .select('id')
         .single()
       if (error || !data) throw new Error(`insert bandera: ${error?.code ?? 'sin fila'}`)

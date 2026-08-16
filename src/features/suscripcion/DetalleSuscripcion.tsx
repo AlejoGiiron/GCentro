@@ -20,6 +20,7 @@ import { fecha, hoyISO, instante, pesos } from '@/lib/formato'
 import { sugerirReactivacion, type Cobertura } from '@/lib/cobertura'
 import { ESTADO_VISUAL, FOCO, NIVEL_VISUAL, SENAL } from '@/lib/tokens'
 import { ESTADOS_COMERCIALES } from '@/features/clientes/schemas'
+import { EditorMensaje } from './EditorMensaje'
 import type { FilaLista } from '@/features/clientes/vista'
 import { CONCEPTOS, METODOS, formularioPagoSchema, type Evento, type Pago } from './schemas'
 import {
@@ -148,27 +149,12 @@ function ConfirmarBandera({ fila }: { fila: FilaLista }) {
         esto se envía cuando lo confirmás.
       </p>
 
-      <label className={ETIQUETA} htmlFor="mensaje">
-        Mensaje del banner{' '}
-        <span className="font-normal text-tinta-debil">
-          — lo ve el cajero del cliente. Máx. 280.
-        </span>
-      </label>
-      <textarea
-        id="mensaje"
-        rows={2}
-        maxLength={280}
-        className={CAMPO}
-        value={mensaje}
-        onChange={(e) => setMensaje(e.target.value)}
-        placeholder="Vacío = sin banner"
-      />
-      <p className="mt-1 text-micro text-tinta-debil">{mensaje.length}/280</p>
+      <EditorMensaje nivel={sugerencia.nivel} valor={mensaje} onChange={setMensaje} />
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           className={`${BOTON} bg-lienzo-realce text-tinta-fuerte hover:bg-lienzo-divisor/40`}
-          disabled={confirmar.isPending}
+          disabled={confirmar.isPending || mensaje.trim().length > 280}
           onClick={() => confirmar.mutate({ nivel: sugerencia.nivel, mensaje: mensaje || null })}
         >
           {/* Estado de carga DESDE EL PRIMER CLIC. La primera llamada del día

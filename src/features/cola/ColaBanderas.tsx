@@ -52,6 +52,31 @@ function CambioEfectivo({ valor }: { valor: boolean | null }) {
   return <span className="italic text-tinta-debil">sin dato</span>
 }
 
+/**
+ * El texto que se le mostró al cliente.
+ *
+ * ⚠️ DOS NULLS DISTINTOS. En una fila posterior a la migración `014`, `null`
+ * significa «se envió sin mensaje». En una anterior significa «no quedó
+ * registro»: la columna no existía y el texto no está en ningún lado.
+ * Mostrarlos igual diría que a alguien no se le dijo nada cuando lo que pasa
+ * es que no se sabe.
+ */
+const NACE_014 = '2026-08-16'
+
+function Mensaje({ f }: { f: FilaCola }) {
+  if (f.mensaje) {
+    return (
+      <div className="mt-0.5 max-w-md text-tinta-media">«{f.mensaje}»</div>
+    )
+  }
+  const anterior = f.creado_en.slice(0, 10) < NACE_014
+  return (
+    <div className="mt-0.5 italic text-tinta-debil">
+      {anterior ? 'mensaje sin registrar' : 'sin mensaje'}
+    </div>
+  )
+}
+
 function Fila({
   f,
   repetida,
@@ -103,8 +128,9 @@ function Fila({
           <CambioEfectivo valor={f.cambio_efectivo} />
         )}
       </td>
-      <td className={`${TD} text-micro`}>
+      <td className={`${TD} whitespace-normal text-micro`}>
         <Autor email={f.admins?.email} />
+        <Mensaje f={f} />
       </td>
       <td className={TD}>
         {pendiente && reintentar && (
@@ -142,7 +168,7 @@ function Tabla({
             <th scope="col" className={TH}>Intentos</th>
             <th scope="col" className={`${TH} ${SEP}`}>Confirmada</th>
             <th scope="col" className={TH}>Resultado</th>
-            <th scope="col" className={TH}>Quién</th>
+            <th scope="col" className={TH}>Quién y qué dijo</th>
             <th scope="col" className={TH}>
               <span className="sr-only">Acciones</span>
             </th>

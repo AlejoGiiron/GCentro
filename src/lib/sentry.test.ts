@@ -132,6 +132,10 @@ const COLUMNAS_DEL_ESQUEMA: ColumnaEsquema[] = [
   // de sync existe `bandera_error_codigo`, que es un enum derivado.
   { tabla: 'banderas_pendientes', columna: 'ultimo_error', ejemplo: 'HMAC invalido para org de Juan Perez' },
   { tabla: 'banderas_pendientes', columna: 'bandera_error_codigo', ejemplo: 'HMAC_INVALIDO', permitida: true },
+  // 014. El texto del banner guardado de este lado. FILTRADO por la misma
+  // razón que `message` del contrato: es prosa que un admin escribe sobre un
+  // cliente concreto, y la única diferencia con la clave inglesa es dónde vive.
+  { tabla: 'banderas_pendientes', columna: 'mensaje', ejemplo: 'Debe dos meses. Hablar con Ana antes del viernes.' },
   // 009. El `changed` del contrato guardado de este lado, en español. Booleano
   // del protocolo de sincronización: no dice nada de nadie.
   { tabla: 'banderas_pendientes', columna: 'cambio_efectivo', ejemplo: false, permitida: true },

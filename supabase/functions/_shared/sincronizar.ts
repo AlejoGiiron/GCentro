@@ -52,8 +52,15 @@ export interface CamposCierre {
 export interface PuertoDatos {
   esAdmin(): Promise<boolean>
   buscarSuscripcion(id: string): Promise<SuscripcionParaBandera | null>
-  /** Escribe la intención y devuelve el id de la fila. */
-  crearBandera(suscripcionId: string, nivel: Nivel): Promise<string>
+  /**
+   * Escribe la intención COMPLETA: nivel y mensaje.
+   *
+   * El mensaje se guarda (014) para dos cosas: poder contestar «¿qué le
+   * dijimos a este cliente?», y que un reintento pueda repetir la intención
+   * entera. Antes se perdía, y reintentar mandaba `null` — que en el producto
+   * BORRA el banner.
+   */
+  crearBandera(suscripcionId: string, nivel: Nivel, mensaje: string | null): Promise<string>
   cerrarBandera(id: string, campos: CamposCierre): Promise<void>
 }
 
@@ -154,7 +161,7 @@ export async function sincronizarBandera(
   //
   // §5: nunca asumir que la escritura funcionó. A partir de acá, todo camino
   // termina con la fila cerrada — confirmada o con su código de error.
-  const banderaId = await datos.crearBandera(suscripcionId, nivel)
+  const banderaId = await datos.crearBandera(suscripcionId, nivel, mensaje)
 
   let resultado: ResultadoEnvio
   try {

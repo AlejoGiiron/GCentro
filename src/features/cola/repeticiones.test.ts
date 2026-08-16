@@ -24,6 +24,7 @@ function fila(suscripcion_id: string, valor_deseado: FilaCola['valor_deseado']):
     ultimo_error: null,
     bandera_error_codigo: null,
     cambio_efectivo: true,
+    mensaje: null,
     confirmado_en: '2026-08-16T10:00:00Z',
     creado_en: '2026-08-16T10:00:00Z',
     admin_id: null,

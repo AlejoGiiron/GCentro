@@ -17,9 +17,18 @@
  * `supabase/functions/_shared/contrato.ts` (§6).
  */
 import { differenceInCalendarDays, parseISO } from 'date-fns'
-import { NIVELES, type Nivel } from '../../supabase/functions/_shared/contrato.ts'
+import {
+  MENSAJE_MAX,
+  NIVELES,
+  type Nivel,
+} from '../../supabase/functions/_shared/contrato.ts'
 
-export { NIVELES }
+/**
+ * Se reexportan desde acá para que el panel no importe del directorio de las
+ * Edge Functions. **El límite NO se duplica**: es el mismo número que valida
+ * el borde antes de enviar, y tener dos sería tener dos límites.
+ */
+export { MENSAJE_MAX, NIVELES }
 export type { Nivel }
 
 /** Fecha de calendario `YYYY-MM-DD`. Un cobro es un día, no un instante (§2). */

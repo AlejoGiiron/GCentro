@@ -20,6 +20,15 @@ export const filaColaSchema = z.object({
   cambio_efectivo: z.boolean().nullable(),
   confirmado_en: z.string().nullable(),
   creado_en: z.string(),
+  /**
+   * El texto que se envió (014).
+   *
+   * ⚠️ El `null` es AMBIGUO en las filas anteriores a la migración —«no se
+   * sabe»— y unívoco en las nuevas —«se envió sin mensaje»—. La UI las separa
+   * por `creado_en`; fusionarlas diría que a alguien no se le dijo nada
+   * cuando en realidad no quedó registro.
+   */
+  mensaje: z.string().nullable(),
   /** `null` = sin autor registrado (anterior a `010`, o SQL Editor). */
   admin_id: z.string().uuid().nullable(),
   admins: z.object({ email: z.string() }).nullable(),
