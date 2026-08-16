@@ -23,6 +23,8 @@
 import { useId, useMemo, useState } from 'react'
 import { AlertTriangle, Circle, Minus, Search } from 'lucide-react'
 import { fecha, instante, pesos, diasEnPalabras } from '@/lib/formato'
+import type { EstadoComercial } from '@/lib/bandera'
+import { ESTADO_VISUAL, FOCO, MARCA_PRUEBA, PUNTO, SENAL, TINTA } from '@/lib/tokens'
 import { ESTADOS_COMERCIALES } from './schemas'
 import { useSuscripciones } from './useSuscripciones'
 import {
@@ -34,27 +36,30 @@ import {
   type Vista,
 } from './vista'
 
-const TH = 'px-3 py-2 text-left font-medium text-slate-400 whitespace-nowrap'
-const TD = 'px-3 py-2 align-top whitespace-nowrap'
-/** Borde que separa un GRUPO del anterior. Marca dónde cambia el sistema. */
-const SEP = 'border-l border-slate-700'
-/** Anillo de foco. Un cambio de color de borde de 1px no es un indicador. */
-const FOCO =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950'
+const TH = 'px-3 py-2 text-left text-micro font-medium text-tinta-media whitespace-nowrap'
+const TD = 'px-3 py-2 align-top text-dato whitespace-nowrap'
+/**
+ * Separación entre GRUPOS. 2px y en `divisor` (3.52:1): es lo que dice "acá
+ * empieza otro sistema" aunque el refuerzo de fondo no se distinga.
+ */
+const SEP = 'border-l-2 border-lienzo-divisor'
+/** Refuerzo del bloque de G-Vento. Imperceptible a propósito; no carga solo. */
+const OTRO_SISTEMA = 'bg-lienzo-panelAlt'
 
 /**
  * El texto es la etiqueta, el color la refuerza — nunca al revés. Un estado
  * codificado solo por color deja de existir para quien no lo distingue, y
  * esta columna es justamente la que se lee de reojo.
  *
- * Todos los tonos están por encima de 4.5:1 sobre `bg-slate-950`, medidos.
+ * Todos los tonos salen de `lib/tokens.ts` y están MEDIDOS: ninguno baja de
+ * 4.5:1 contra los tres fondos.
  */
 const ATENCION: Record<Atencion, { texto: string; clase: string }> = {
-  REGRESION_APLICADA: { texto: 'restringe de más', clase: 'text-red-400' },
-  SIN_CONFIRMAR: { texto: 'sin confirmar', clase: 'text-amber-400' },
-  SIN_PUENTE: { texto: 'sin puente', clase: 'text-slate-400' },
-  FALTA_ESCALAR: { texto: 'falta escalar', clase: 'text-sky-400' },
-  POR_VENCER: { texto: 'vence pronto', clase: 'text-slate-300' },
+  REGRESION_APLICADA: { texto: 'restringe de más', clase: SENAL.critico },
+  SIN_CONFIRMAR: { texto: 'sin confirmar', clase: SENAL.alerta },
+  SIN_PUENTE: { texto: 'sin puente', clase: TINTA.media },
+  FALTA_ESCALAR: { texto: 'falta escalar', clase: SENAL.info },
+  POR_VENCER: { texto: 'vence pronto', clase: TINTA.media },
   AL_DIA: { texto: '', clase: '' },
 }
 
@@ -71,22 +76,15 @@ const VISTAS: Array<{ id: Vista; texto: string; ayuda: string }> = [
 /** Guion de "nada que reportar": decorativo, no se lee en voz alta. */
 function Nada() {
   return (
-    <span className="text-slate-500" aria-hidden="true">
+    <span className="text-tinta-debil" aria-hidden="true">
       —
     </span>
   )
 }
 
-function EstadoComercial({ estado }: { estado: string }) {
-  const color =
-    estado === 'activa'
-      ? 'text-slate-200'
-      : estado === 'gracia'
-        ? 'text-amber-400'
-        : estado === 'suspendida'
-          ? 'text-red-400'
-          : 'text-slate-400'
-  return <span className={`font-medium ${color}`}>{estado}</span>
+function EstadoComercial({ estado }: { estado: EstadoComercial }) {
+  // `activa` sale en tinta fuerte, sin color: lo normal no grita (tokens.ts).
+  return <span className={`font-medium ${ESTADO_VISUAL[estado]}`}>{estado}</span>
 }
 
 /**
@@ -98,22 +96,22 @@ function Bandera({ b }: { b: EstadoBandera }) {
   return (
     <div className="space-y-0.5">
       {b.clase === 'sin_puente' && (
-        <span className="inline-flex items-center gap-1.5 text-slate-400">
+        <span className="inline-flex items-center gap-1.5 text-tinta-media">
           <Minus size={12} aria-hidden="true" />
           sin puente
         </span>
       )}
 
       {b.clase === 'nunca' && (
-        <span className="inline-flex items-center gap-1.5 text-slate-400">
-          <Circle size={9} className="fill-slate-500 text-slate-500" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 text-tinta-media">
+          <Circle size={9} className={PUNTO.neutro} aria-hidden="true" />
           nunca sincronizada
         </span>
       )}
 
       {b.clase === 'confirmada' && (
-        <span className="inline-flex items-center gap-1.5 text-slate-200">
-          <Circle size={9} className="fill-emerald-500 text-emerald-500" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 text-tinta-fuerte">
+          <Circle size={9} className={PUNTO.ok} aria-hidden="true" />
           {b.nivel}
         </span>
       )}
@@ -121,7 +119,7 @@ function Bandera({ b }: { b: EstadoBandera }) {
       {/* Independiente de lo de arriba: puede haber una confirmación vieja Y
           intentos nuevos que fallaron. Son dos hechos, no uno. */}
       {b.sinConfirmar > 0 && (
-        <div className="flex items-center gap-1.5 text-amber-400">
+        <div className="flex items-center gap-1.5 text-senal-alerta">
           <AlertTriangle size={12} aria-hidden="true" />
           {b.sinConfirmar} sin confirmar
           {b.ultimoCodigo && <span>· {b.ultimoCodigo}</span>}
@@ -136,30 +134,28 @@ function Fila({ f }: { f: FilaLista }) {
   const a = ATENCION[f.atencion]
 
   return (
-    <tr className="border-b border-slate-800 hover:bg-slate-900/60">
+    <tr className="border-b border-lienzo-borde hover:bg-lienzo-realce">
       <td className={`${TD} ${a.clase} font-medium`}>{a.texto || <Nada />}</td>
 
       {/* ── Contrato ────────────────────────────────────────────────── */}
-      <th scope="row" className={`${TD} ${SEP} text-left font-normal text-slate-100`}>
+      <th scope="row" className={`${TD} ${SEP} text-left font-normal text-tinta-fuerte`}>
         {s.clientes.nombre_comercial}
         {s.clientes.es_prueba && (
-          <span className="ml-2 rounded border border-sky-800 bg-sky-950 px-1 py-px text-[11px] uppercase tracking-wide text-sky-300">
-            prueba
-          </span>
+          <span className={MARCA_PRUEBA}>prueba</span>
         )}
       </th>
-      <td className={`${TD} text-slate-300`}>{s.productos.codigo}</td>
-      <td className={`${TD} text-slate-300`}>{s.planes.nombre}</td>
-      <td className={`${TD} text-slate-300`}>
+      <td className={`${TD} text-tinta-media`}>{s.productos.codigo}</td>
+      <td className={`${TD} text-tinta-media`}>{s.planes.nombre}</td>
+      <td className={`${TD} text-tinta-media`}>
         {s.terminos.codigo}
         {s.sedes_adicionales > 0 && (
-          <span className="ml-1.5 text-slate-400">+{s.sedes_adicionales} sede(s)</span>
+          <span className="ml-1.5 text-tinta-debil">+{s.sedes_adicionales} sede(s)</span>
         )}
       </td>
-      <td className={`${TD} text-right tabular-nums text-slate-100`}>
+      <td className={`${TD} text-right tabular-nums text-tinta-fuerte`}>
         {pesos(f.montoCiclo)}
         {s.terminos.meses > 1 && (
-          <div className="text-xs text-slate-400">{pesos(f.mensual)}/mes</div>
+          <div className="text-micro text-tinta-debil">{pesos(f.mensual)}/mes</div>
         )}
       </td>
 
@@ -167,32 +163,32 @@ function Fila({ f }: { f: FilaLista }) {
       <td className={`${TD} ${SEP}`}>
         <EstadoComercial estado={s.estado} />
       </td>
-      <td className={`${TD} text-slate-300`}>
+      <td className={`${TD} text-tinta-media`}>
         {fecha(s.proximo_cobro)}
-        <div className="text-xs text-slate-400">
+        <div className="text-micro text-tinta-debil">
           {diasEnPalabras(f.sugerencia.dias_para_cobro)}
         </div>
       </td>
-      <td className={`${TD} text-slate-300`}>
+      <td className={`${TD} text-tinta-media`}>
         {f.sugerencia.nivel}
-        <div className="text-xs text-slate-400">{f.sugerencia.regla.toLowerCase()}</div>
+        <div className="text-micro text-tinta-debil">{f.sugerencia.regla.toLowerCase()}</div>
       </td>
 
       {/* ── G-Vento: lo que el producto sabe ────────────────────────── */}
-      <td className={`${TD} ${SEP}`}>
+      <td className={`${TD} ${SEP} ${OTRO_SISTEMA}`}>
         <Bandera b={f.bandera} />
       </td>
-      <td className={`${TD} text-slate-300`}>
+      <td className={`${TD} text-tinta-media`}>
         {f.bandera.desde ? (
           <>
             {instante(f.bandera.desde)}
             {/* 009: `false` = ya estaba así. `null` = fila vieja, sin dato.
                 No se muestran igual porque no significan lo mismo. */}
             {f.bandera.cambioEfectivo === false && (
-              <div className="text-xs text-slate-400">ya estaba así</div>
+              <div className="text-micro text-tinta-debil">ya estaba así</div>
             )}
             {f.bandera.cambioEfectivo === null && (
-              <div className="text-xs text-slate-400">sin dato</div>
+              <div className="text-micro text-tinta-debil">sin dato</div>
             )}
           </>
         ) : (
@@ -228,7 +224,7 @@ export function ListaClientes() {
 
   return (
     <div>
-      <h1 className="mb-3 text-base font-semibold text-slate-100">Suscripciones</h1>
+      <h1 className="mb-3 text-titulo text-tinta-fuerte">Suscripciones</h1>
 
       <div className="mb-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex items-center gap-1">
@@ -239,13 +235,13 @@ export function ListaClientes() {
               aria-pressed={vista === v.id}
               className={`rounded px-2.5 py-1 text-sm ${FOCO} ${
                 vista === v.id
-                  ? 'bg-slate-800 font-medium text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-lienzo-realce font-medium text-tinta-fuerte'
+                  : 'text-tinta-media hover:text-tinta-fuerte'
               }`}
             >
               {v.texto}
               {v.id === 'hoy' && atencion.visibles > 0 && (
-                <span className="ml-1.5 rounded bg-amber-500/20 px-1.5 py-px text-xs tabular-nums text-amber-300">
+                <span className="ml-1.5 rounded bg-senal-alerta/15 px-1.5 py-px text-xs tabular-nums text-senal-alerta">
                   {atencion.visibles}
                   <span className="sr-only"> necesitan atención</span>
                 </span>
@@ -262,7 +258,7 @@ export function ListaClientes() {
             <Search
               size={13}
               aria-hidden="true"
-              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-tinta-media"
             />
             <input
               id={idBusqueda}
@@ -270,7 +266,7 @@ export function ListaClientes() {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar cliente…"
-              className={`w-48 rounded border border-slate-700 bg-slate-900 py-1 pl-7 pr-2 text-sm text-slate-200 placeholder:text-slate-400 ${FOCO}`}
+              className={`w-48 rounded border border-lienzo-divisor bg-lienzo-panel py-1 pl-7 pr-2 text-dato text-tinta-fuerte placeholder:text-tinta-media ${FOCO}`}
             />
           </div>
 
@@ -281,7 +277,7 @@ export function ListaClientes() {
             id={idEstado}
             value={estado}
             onChange={(e) => setEstado(e.target.value)}
-            className={`rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-300 ${FOCO}`}
+            className={`rounded border border-lienzo-divisor bg-lienzo-panel px-2 py-1 text-dato text-tinta-media ${FOCO}`}
           >
             <option value="">Todos los estados</option>
             {ESTADOS_COMERCIALES.map((e) => (
@@ -291,12 +287,12 @@ export function ListaClientes() {
             ))}
           </select>
 
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+          <label className="flex cursor-pointer items-center gap-2 text-micro text-tinta-debil">
             <input
               type="checkbox"
               checked={mostrarPrueba}
               onChange={(e) => setMostrarPrueba(e.target.checked)}
-              className={`h-3.5 w-3.5 accent-sky-600 ${FOCO}`}
+              className={`h-3.5 w-3.5 accent-senal-info ${FOCO}`}
             />
             Tenants de prueba
           </label>
@@ -306,17 +302,17 @@ export function ListaClientes() {
       {/* La explicación de la vista activa, VISIBLE. Estaba sólo en `title=`,
           que no es fiable por teclado ni existe en táctil — y PRODUCT.md dice
           que no se puede asumir que quien abre conoce el sistema. */}
-      <p className="mb-3 text-xs text-slate-400">
+      <p className="mb-3 text-micro text-tinta-debil">
         {vistaActual.ayuda}
         {buscando && ' · La búsqueda recorre todas las suscripciones, sin este filtro.'}
       </p>
 
-      {isPending && <p className="text-sm text-slate-400">Cargando…</p>}
+      {isPending && <p className="text-dato text-tinta-media">Cargando…</p>}
 
       {error && (
         <div
           role="alert"
-          className="rounded border border-red-900 bg-red-950/40 p-3 text-sm text-red-300"
+          className="rounded border border-senal-critico/40 bg-senal-critico/10 p-3 text-dato text-senal-critico"
         >
           No se pudo leer la lista. Revisá la conexión y volvé a intentar; si sigue
           fallando, el detalle está en la consola.
@@ -324,7 +320,7 @@ export function ListaClientes() {
       )}
 
       {data && filas.length === 0 && (
-        <p className="text-sm text-slate-300">
+        <p className="text-dato text-tinta-media">
           {buscando ? (
             'Ningún cliente coincide con la búsqueda.'
           ) : vista === 'hoy' ? (
@@ -347,7 +343,7 @@ export function ListaClientes() {
       {/* Lo escondido se anuncia SIEMPRE, con tabla o sin ella. Un contador que
           sólo mira lo visible afirma sobre un conjunto que no revisó. */}
       {atencion.ocultos > 0 && (
-        <p className="mt-2 text-sm text-amber-300">
+        <p className="mt-2 text-dato text-senal-alerta">
           {atencion.ocultos === 1
             ? 'Además, 1 tenant de prueba necesita atención y está oculto.'
             : `Además, ${atencion.ocultos} tenants de prueba necesitan atención y están ocultos.`}{' '}
@@ -361,7 +357,7 @@ export function ListaClientes() {
       )}
 
       {filas.length > 0 && (
-        <div className="overflow-x-auto rounded border border-slate-800">
+        <div className="overflow-x-auto rounded border border-lienzo-borde">
           <table className="w-full border-collapse text-sm">
             <caption className="sr-only">
               Suscripciones. Las columnas están en tres grupos: el contrato, el estado que
@@ -372,21 +368,21 @@ export function ListaClientes() {
               {/* Fila de GRUPO: nombra los dos sistemas. Es la que hace visible
                   que las columnas de la derecha no son "más datos del mismo
                   lugar" sino lo que dice otro sistema. */}
-              <tr className="border-b border-slate-800 bg-slate-900/80 text-[11px] uppercase tracking-wide">
-                <th scope="col" rowSpan={2} className={`${TH} text-slate-400`}>
+              <tr className="border-b border-lienzo-borde bg-lienzo-panel text-micro uppercase tracking-grupo">
+                <th scope="col" rowSpan={2} className={`${TH} text-tinta-media`}>
                   Atención
                 </th>
-                <th scope="colgroup" colSpan={5} className={`${TH} ${SEP} text-slate-400`}>
+                <th scope="colgroup" colSpan={5} className={`${TH} ${SEP} text-tinta-debil`}>
                   Contrato
                 </th>
-                <th scope="colgroup" colSpan={3} className={`${TH} ${SEP} text-slate-300`}>
+                <th scope="colgroup" colSpan={3} className={`${TH} ${SEP} text-tinta-media`}>
                   G-Centro · lo que decidimos
                 </th>
-                <th scope="colgroup" colSpan={2} className={`${TH} ${SEP} text-slate-300`}>
+                <th scope="colgroup" colSpan={2} className={`${TH} ${SEP} ${OTRO_SISTEMA} text-tinta-media`}>
                   G-Vento · lo que el producto sabe
                 </th>
               </tr>
-              <tr className="border-b border-slate-800 bg-slate-900/40 text-xs">
+              <tr className="border-b border-lienzo-borde bg-lienzo-panel text-xs">
                 <th scope="col" className={`${TH} ${SEP}`}>
                   Cliente
                 </th>
@@ -430,8 +426,8 @@ export function ListaClientes() {
         </div>
       )}
 
-      <p className="mt-3 max-w-3xl text-xs leading-relaxed text-slate-400">
-        <strong className="text-slate-300">
+      <p className="mt-3 max-w-3xl text-xs leading-relaxed text-tinta-media">
+        <strong className="text-tinta-media">
           Las dos últimas columnas no se derivan de las otras.
         </strong>{' '}
         «Estado» es lo que decidimos acá; «Bandera» es lo último que G-Vento confirmó por

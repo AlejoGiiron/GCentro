@@ -914,14 +914,69 @@ Mismo stack que G-Vento. La consistencia acá no es estética: el camino de depl
 conoce, Sentry se configura igual, y no hay que cambiar de contexto mental.
 
 - React 18 + TypeScript strict + Vite. SPA, sin SSR.
-- Tailwind. Sin design system propio.
+- Tailwind, con **tokens semánticos propios** (`tailwind.config.js` + `src/lib/tokens.ts`).
 - lucide para íconos.
 - Zustand · React Query · Zod en los bordes · date-fns.
 - Supabase: Postgres + Auth + Edge Functions.
 - Repo único, `src/` normal. Sin monorepo.
 
-Se puede recortar sin culpa: responsive más allá de que no se rompa, estados de carga
-elegantes, animaciones. Tablas y formularios.
+### Diseño de instrumento, no ausencia de diseño
+
+> **Esta sección decía "sin design system propio" y "se puede recortar sin culpa:
+> responsive, estados de carga, animaciones. Tablas y formularios."** Se escribió cuando
+> el supuesto era **un solo usuario técnico, el que construyó el sistema**. Ese supuesto
+> cambió: son varios operadores, no se puede asumir que conocen el sistema por dentro, y
+> alguien va a abrir esta pantalla todos los días.
+
+Un tablero de avión es denso, sin animaciones y feo para un turista — y está diseñadísimo.
+Ese es el objetivo. **Que abrirla todos los días no sea un castigo.**
+
+#### Innegociable
+
+Lo que sigue no se relaja, y una sugerencia de diseño que lo contradiga se rechaza sin
+discutir el mérito estético:
+
+1. **Densidad sobre respiro.** Es una herramienta de trabajo, no un tablero de métricas.
+   **Si un cambio hace que quepan menos filas en pantalla, no se hace.** Es la prueba
+   concreta, no una intención: la migración a tokens se midió y pasó de 23 a 24 filas
+   visibles en 1080p.
+2. **Sin animaciones decorativas.** Transiciones sólo donde eviten un salto que confunda.
+3. **El agrupamiento de tres bloques** (contrato · G-Centro · G-Vento) y los **tres
+   estados de bandera** nombrados distinto. Son §5 hecho pantalla.
+4. **Nada que priorice verse bien sobre leerse rápido.**
+5. **Solo escritorio.** Se usa sentado, con teclado y monitor. Los blancos táctiles
+   chicos son una decisión, no un defecto.
+
+#### Las dos reglas de color
+
+1. **Un solo color por fila**, en la columna «Atención». Si el estado y la bandera también
+   se tiñeran, la fila sería un semáforo y nada saltaría.
+2. **`activa` no lleva color.** Lo normal es la ausencia de color. Pintar lo que está bien
+   obliga al ojo a leer todas las filas para descartarlas.
+
+Si algo presiona contra estas dos, ganan ellas.
+
+#### Los tokens son semánticos y están medidos
+
+`senal-critico`, no `red-400`. Un nombre de color sobrevive a un cambio de paleta
+**convirtiéndose en mentira**: `text-red-400` en una fila que ya no es crítica sigue
+compilando.
+
+**Todo token de texto pasa 4.5:1 contra los cuatro fondos**, verificado por cálculo y no
+a ojo. No existe la categoría "solo decorativo": esa fue exactamente la causa del defecto
+del 16/08, cuando la nota al pie que explicaba el concepto central de §5 quedó a 2.66:1.
+Si un token existe, se puede escribir texto con él; lo decorativo vive en `lienzo`, y usar
+un color de lienzo para texto se ve mal en el código, que es el punto.
+
+**El peso de "son dos sistemas" está en el divisor de 2px** (3.52:1, cumple WCAG 1.4.11
+como elemento no textual portador de significado) **y en el encabezado del grupo**. La
+diferencia de fondo entre bloques es 1.03:1 — imperceptible a propósito: es refuerzo, y
+puede desaparecer en un monitor mal calibrado sin que se pierda nada.
+
+#### Lo que sigue siendo recortable sin culpa
+
+Responsive más allá de que no se rompa. Ilustración, ornamento, microinteracciones,
+pantallas de bienvenida, tours. Cualquier cosa cuyo beneficio sea que se vea moderna.
 
 ### El filtro de privacidad de Sentry es allowlist
 
