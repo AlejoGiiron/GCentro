@@ -20,6 +20,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
+import { interpretar, type ResultadoPuente } from '@/lib/puente'
 import { filaColaSchema, type FilaCola } from './schemas'
 
 const SELECT = `
@@ -94,7 +95,7 @@ export function useReintentar() {
   return useMutation({
     meta: { area: 'bandera' },
     mutationKey: ['reintentar-bandera'],
-    mutationFn: async (f: FilaCola) => {
+    mutationFn: async (f: FilaCola): Promise<ResultadoPuente> => {
       const { data, error } = await supabase.functions.invoke('sincronizar-bandera', {
         body: {
           suscripcion_id: f.suscripcion_id,
@@ -106,8 +107,7 @@ export function useReintentar() {
           mensaje: f.mensaje,
         },
       })
-      if (error) throw error
-      return data as { ok: boolean; bandera_error_codigo?: string }
+      return interpretar(data, error)
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['cola'] })

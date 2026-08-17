@@ -16,6 +16,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
 import type { Nivel } from '@/lib/bandera'
+import { interpretar, type ResultadoPuente } from '@/lib/puente'
 import { eventoSchema, pagoSchema, type FormularioPago } from './schemas'
 import type { EstadoComercial } from '@/lib/bandera'
 
@@ -130,19 +131,12 @@ export function useRegistrarPago(suscripcionId: string, clienteId: string) {
   })
 }
 
-export interface ResultadoBandera {
-  ok: boolean
-  changed?: boolean
-  bandera_error_codigo?: string
-  error?: string
-}
-
 export function useConfirmarBandera(suscripcionId: string) {
   const invalidar = useInvalidar(suscripcionId)
   return useMutation({
     meta: { area: 'bandera' },
     mutationKey: ['confirmar-bandera'],
-    mutationFn: async (v: { nivel: Nivel; mensaje: string | null }): Promise<ResultadoBandera> => {
+    mutationFn: async (v: { nivel: Nivel; mensaje: string | null }): Promise<ResultadoPuente> => {
       const { data, error } = await supabase.functions.invoke('sincronizar-bandera', {
         body: {
           suscripcion_id: suscripcionId,
@@ -150,10 +144,11 @@ export function useConfirmarBandera(suscripcionId: string) {
           mensaje: v.mensaje,
         },
       })
-      // `functions.invoke` sólo tira en fallo de transporte; un 4xx/5xx viene
-      // en `data`. Los dos casos terminan igual acá: no se aplicó.
-      if (error) throw error
-      return data as ResultadoBandera
+      // ⚠️ NO se tira ante `error`. `functions.invoke` tira ante CUALQUIER
+      // no-2xx, así que hacerlo convertía el 502 —llegó, no se aplicó, con
+      // código conocido— en "no se pudo llegar al puente". `interpretar`
+      // distingue las cinco respuestas y valida la forma (ver lib/puente.ts).
+      return interpretar(data, error)
     },
     onSuccess: invalidar,
   })

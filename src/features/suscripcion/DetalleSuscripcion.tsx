@@ -23,12 +23,12 @@ import { ESTADOS_COMERCIALES } from '@/features/clientes/schemas'
 import { EditorMensaje } from './EditorMensaje'
 import type { FilaLista } from '@/features/clientes/vista'
 import { CONCEPTOS, METODOS, formularioPagoSchema, type Evento, type Pago } from './schemas'
+import { textoDe } from '@/lib/puente-texto'
 import {
   useCambiarEstado,
   useConfirmarBandera,
   useHistorial,
   useRegistrarPago,
-  type ResultadoBandera,
 } from './useDetalle'
 
 const CAMPO =
@@ -130,7 +130,7 @@ function ConfirmarBandera({ fila }: { fila: FilaLista }) {
   const sugerencia = fila.sugerencia
   const [mensaje, setMensaje] = useState('')
   const confirmar = useConfirmarBandera(fila.suscripcion.id)
-  const r = confirmar.data as ResultadoBandera | undefined
+  const r = confirmar.data
   const yaAplicado = fila.bandera.clase === 'confirmada' ? fila.bandera.nivel : undefined
   const coincide = yaAplicado === sugerencia.nivel
 
@@ -171,27 +171,32 @@ function ConfirmarBandera({ fila }: { fila: FilaLista }) {
           )}
         </button>
 
-        {coincide && !confirmar.isPending && (
+        {/* ⚠️ ESTO DESCRIBE UN ESTADO, NO EL RESULTADO DE UNA ACCIÓN.
+            Decía «El producto ya está en X. Reenviar no cambia nada.» y
+            aparecía SOLO, sin clic, en cuanto el nivel aplicado coincidía con
+            el sugerido. El 17/08 se leyó como la respuesta a un reenvío que
+            nunca ocurrió, y dio por verificada una prueba de idempotencia que
+            no se hizo.
+
+            Ahora se redacta como estado y desaparece apenas hay un resultado
+            real que mostrar: dos textos compitiendo en el mismo lugar es lo
+            que hace que uno se lea como el otro. */}
+        {coincide && !confirmar.isPending && !confirmar.data && (
           <span className="text-micro text-tinta-debil">
-            El producto ya está en «{yaAplicado}». Reenviar no cambia nada.
+            Estado actual: el producto ya tiene «{yaAplicado}».
           </span>
         )}
       </div>
 
       <div aria-live="polite" className="mt-2">
-        {r?.ok && (
-          <span className={`text-micro ${SENAL.ok}`}>
-            {r.changed ? 'Aplicado en el producto.' : 'Ya estaba así — no se movió nada.'}
-          </span>
-        )}
-        {r && !r.ok && (
-          <span role="alert" className={`text-micro ${SENAL.critico}`}>
-            No se aplicó. Código: {r.bandera_error_codigo ?? 'desconocido'}. Quedó en la cola.
+        {r && (
+          <span className={`text-micro ${textoDe(r).ok ? SENAL.ok : SENAL.critico}`}>
+            {textoDe(r).texto}
           </span>
         )}
         {confirmar.isError && (
           <span role="alert" className={`text-micro ${SENAL.critico}`}>
-            No se pudo llegar al puente. Quedó sin aplicar.
+            No se pudo enviar. Quedó sin aplicar.
           </span>
         )}
       </div>

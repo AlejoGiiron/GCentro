@@ -24,6 +24,7 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, Loader2, RotateCw } from 'lucide-react'
 import { instante } from '@/lib/formato'
 import { RUTAS } from '@/lib/rutas'
+import { textoDe } from '@/lib/puente-texto'
 import { FOCO, MARCA_PRUEBA, SENAL, TINTA } from '@/lib/tokens'
 import { conRepeticiones } from './repeticiones'
 import type { FilaCola } from './schemas'
@@ -267,11 +268,13 @@ export function ColaBanderas() {
                   Reintentando… deja una fila nueva en la cola.
                 </span>
               )}
-              {!enVuelo && reintentar.isSuccess && (
-                <span className={`text-micro ${reintentar.data?.ok ? SENAL.ok : SENAL.critico}`}>
-                  {reintentar.data?.ok
+              {!enVuelo && reintentar.isSuccess && reintentar.data && (
+                <span
+                  className={`text-micro ${textoDe(reintentar.data).ok ? SENAL.ok : SENAL.critico}`}
+                >
+                  {textoDe(reintentar.data).ok
                     ? 'Aplicado. La fila vieja queda como registro del intento que falló.'
-                    : `No se aplicó. Código: ${reintentar.data?.bandera_error_codigo ?? 'desconocido'}.`}
+                    : textoDe(reintentar.data).texto}
                 </span>
               )}
               {!enVuelo && reintentar.isError && (
