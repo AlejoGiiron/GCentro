@@ -1391,6 +1391,33 @@ No es una función postergada:
 Si algún día hace falta —una disputa, una auditoría—, lo que se agrega es un enlace al
 mensaje, no una copia del archivo.
 
+### 9.8 Lo que se verificó en vivo, y con qué método
+
+Se anota **cómo** se verificó cada cosa, no sólo que se verificó: el repaso del 16/08
+encontró tres afirmaciones que nadie había comprobado, y dos veces un método equivocado
+dio verde sobre algo falso.
+
+| Qué | Cuándo | Método |
+|---|---|---|
+| El puente contra `aplicar-estado` real | 13 y 14/08 | `curl` |
+| Idempotencia (mismo `subscription_updated_at`) | 14/08 | `curl` |
+| Caminos de error 400 y 422 | 16/08 | `curl` |
+| `MAX(cubre_hasta)`, la RPC, el `ROW_COUNT` | 16/08 | `curl` + SQL |
+| `PAGO_SIN_REACTIVAR` sobre datos reales | 16/08 | código de producción sobre payload real |
+| **Login, las cuatro pantallas y el puente desde el navegador** | **17/08** | **la app desplegada en Vercel** |
+| La columna `mensaje` de `014` | 17/08 | la app desplegada |
+
+> ⚠️ **`curl` no es el camino de la aplicación, y eso costó caro.** El 17/08 se descubrió
+> que el handler no respondía al **preflight CORS**: devolvía `405` al `OPTIONS` sin
+> cabeceras. O sea que **el botón de confirmar la bandera y el de reintentar nunca
+> pudieron funcionar desde un navegador** — ni en local ni en producción. El circuito se
+> había verificado cinco veces contra la base real, y ninguna de esas veces pasó por donde
+> pasa un operador.
+>
+> **Sigue sin verificarse desde el navegador:** la idempotencia. El 17/08 se dio por
+> probada leyendo un texto de la pantalla que describía un estado, no el resultado de una
+> acción — la segunda llamada nunca ocurrió y la cola no tiene la fila que lo probaría.
+
 ### 9.7 Pendientes
 
 1. **El barrido en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
@@ -1406,11 +1433,10 @@ mensaje, no una copia del archivo.
    pantalla — o sea que el defecto está escondido detrás de código inalcanzable, que es
    la peor forma de tenerlo. Derivar `proximo_cobro` (`015`) hizo desaparecer el síntoma
    visible; éste sigue ahí.
-3. ~~La UI.~~ **HECHA.** Las cuatro pantallas existen: la lista, el detalle con sus tres
-   acciones, la cola de banderas y el editor del mensaje. Lo que falta para usarlas no son
-   pantallas: es **dónde vive la aplicación en producción**. Hoy corre con `pnpm dev` en
-   una máquina, lo que hace imposible que exista un segundo operador — el supuesto central
-   de `PRODUCT.md`.
+3. ~~La UI.~~ **HECHA Y EJERCITADA.** Las cuatro pantallas existen y se usaron desde el
+   despliegue el 17/08: login con TOTP, plantilla, envío de la bandera con su estado de
+   carga, y la cola mostrando la fila confirmada con el mensaje guardado. Queda un solo
+   paso sin hacer desde el navegador — la repetición idéntica, ver §9.8.
 4. **Desactivar admins en vez de borrarlos.** Hoy revocar un acceso es borrar la fila, y
    con `on delete set null` eso borra la autoría de todo lo que esa persona hizo (§3).
    Falta un `desactivado_en` en `admins` y que `es_admin()` lo exija en null. Toca la
