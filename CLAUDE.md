@@ -95,6 +95,21 @@ pantalla nueva que dependa de un contexto —router, provider— suma el suyo.
 test pasaba con y sin el bug: la regresión se probó introduciéndola a mano.
 Si un test no se vio fallar, no se sabe qué prueba.
 
+**Una verificación que no pasa por el CAMINO REAL DEL USUARIO no verifica
+el camino real del usuario, por más que toque la base de producción.**
+
+El puente se verificó cinco veces contra la base real, con `curl`. Ninguna
+de esas veces pasó por donde pasa un operador, y por eso nadie vio que el
+handler no respondía al preflight CORS: **el botón de confirmar la bandera
+nunca pudo funcionar desde un navegador**, ni en local ni en producción.
+Curl no hace preflight.
+
+En la misma pasada, un paso "verificado" desde el navegador tampoco había
+ocurrido: se leyó como resultado un texto que describía un estado. La
+tabla de §9.8 anota el MÉTODO de cada verificación justamente por esto —
+"contra la base real" y "por el camino del usuario" son dos cosas, y sólo
+la segunda prueba que la aplicación funciona.
+
 **Cubrir por COBERTURA en vez de por MODO DE FALLO produce verde falso.** Un
 `renderToString` sobre `LoginPage` daría verde sin tocar ninguno de sus modos
 de fallo reales —el deadlock de `onAuthStateChange`, los factores TOTP
