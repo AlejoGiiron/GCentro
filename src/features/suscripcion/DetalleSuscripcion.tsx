@@ -240,7 +240,7 @@ function RegistrarPago({ fila }: { fila: FilaLista }) {
       <h2 className={TITULO_SECCION}>Registrar un pago</h2>
       <p className="mb-3 text-micro text-tinta-debil">
         El comprobante llega por WhatsApp y se valida a mano. Acá va la referencia; el
-        respaldo vive en el chat y en el extracto (§9.8).
+        respaldo vive en el chat y en el extracto (§9.10).
       </p>
 
       <div className="grid gap-3 sm:grid-cols-3">

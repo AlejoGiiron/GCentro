@@ -244,11 +244,22 @@ export function datosDelEvento(
 
 // ── Estado de implementación ──────────────────────────────────────────────
 
-export type EstadoImplementacion =
-  | 'pendiente'
-  | 'cobrada'
-  | 'exonerada_condicional'
-  | 'exonerada'
+/**
+ * Los cuatro estados del CHECK de `suscripciones.estado_implementacion`.
+ *
+ * Es un ARRAY y no sólo un tipo a propósito: un tipo de TypeScript no existe
+ * en tiempo de ejecución, así que no se puede comparar contra el esquema. La
+ * guarda de `cobro.esquema.test.ts` lee el CHECK de la migración y lo compara
+ * con esto — sin el array, esa comprobación sería imposible.
+ */
+export const ESTADOS_IMPLEMENTACION = [
+  'pendiente',
+  'cobrada',
+  'exonerada_condicional',
+  'exonerada',
+] as const
+
+export type EstadoImplementacion = (typeof ESTADOS_IMPLEMENTACION)[number]
 
 /**
  * Estado inicial al firmar. Un anual arranca EXONERADA CONDICIONAL: la

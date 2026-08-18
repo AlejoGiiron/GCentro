@@ -18,9 +18,10 @@ caminos de error 400 y 422 sin escribir en la cola.
 Resueltas: IVA (§9.1), cobro anticipado (§9.2), implementación exonerada (§9.3),
 `organizacion_externa_id` (§9.4), el contrato del puente (§9.5), el camino real (§9.6).
 
-Falta: lo listado en §9.7 —barrido en diferido, desactivar admins en vez de borrarlos, el
-`motivo` de un cambio de estado, `RESTRINGIDA` en el enum de eventos—, el **backup**
-(§8, que no está montado), los precios de `planes` sin cargar, y las pantallas 2 a 4.
+Falta: lo listado en §9.7 —firmar una suscripción desde el panel, que es lo que le da
+consumidor al modelo de cobro (§9.9); el barrido en diferido; desactivar admins en vez de
+borrarlos; `RESTRINGIDA` en el enum de eventos—, el **backup** (§8, que no está montado)
+y los precios de `planes` sin cargar.
 
 ---
 
@@ -1370,7 +1371,7 @@ las dos observaciones de §5 sobre el arranque en frío y el crecimiento de la c
 **Todavía sin correr en vivo:** los caminos de error (400 por valor inválido, 422 por
 suscripción sin `organizacion_externa_id`). Están probados contra el doble.
 
-### 9.8 El comprobante no se guarda — DECISIÓN, no olvido
+### 9.10 El comprobante no se guarda — DECISIÓN, no olvido
 
 **El respaldo del pago vive en WhatsApp y en el extracto bancario.** En G-Centro quedan
 `referencia` y `nota`, texto, y nada más. **No se agrega Storage.**
@@ -1418,6 +1419,50 @@ dio verde sobre algo falso.
 > probada leyendo un texto de la pantalla que describía un estado, no el resultado de una
 > acción — la segunda llamada nunca ocurrió y la cola no tiene la fila que lo probaría.
 
+### 9.9 El modelo de cobro está completo y no tiene consumidor
+
+`calcularCambioDePlan`, `transicionImplementacion`, `implementacionAlFirmar`,
+`tarifaDiaria`, `diasDelPeriodo` y `diasRestantes` están escritos y probados —46 tests— y
+**ninguno se ejecuta desde el panel.**
+
+**La causa es una sola, y explica los dos huecos a la vez: el panel no puede crear ni
+modificar una suscripción.** Cero `insert` y cero `update` sobre `suscripciones` fuera de
+la RPC que cambia el estado comercial; ningún formulario toca `termino`, `plan_id` ni
+`sedes_adicionales`. Firmar un contrato, cambiar de plan y cambiar de término no existen
+como acciones — y §1 nunca los puso en v1.
+
+De ahí se siguen las dos consecuencias que parecían problemas distintos:
+
+- **`estado_implementacion` nunca avanza.** No hay quién dispare `ANIVERSARIO_ANUAL`.
+- **El cambio de plan a mitad de período no se puede hacer**, aunque el modelo que lo
+  resuelve —el que evita regalar doce meses en un downgrade (§4)— esté listo y probado.
+
+#### El daño es LATENTE, no actual
+
+> Se ordenó una vez arreglar esto primero, con el argumento de que G-10 y Salchimelo
+> quedarían con la implementación reclamable para siempre. **Verificado contra los seeds:
+> es falso.** Los dos son `mensual` con `estado_implementacion = 'cobrada'`, que es un
+> estado terminal — ya la pagaron, no hay nada que reclamar. LAB es `mensual` y
+> `exonerada`, también terminal. **Las tres suscripciones están en estado terminal**, así
+> que `transicionImplementacion` las devolvería sin cambios aunque corriera.
+
+**Condición de disparo: el primer contrato ANUAL.** Ese día la suscripción nace
+`exonerada_condicional`, y doce meses después nadie la pasa a `exonerada` — la
+implementación queda condicionalmente perdonada para siempre y sigue siendo reclamable.
+No es «algún día»: es el día que se firme un anual.
+
+#### Mientras tanto: código en espera, con guarda
+
+No se le construye pantalla al modelo sin que exista «firmar una suscripción»: sería la
+mitad de atrás de un flujo cuya mitad de adelante no está, operando sobre datos que sólo
+se crean por SQL.
+
+Lo que sí existe es `src/lib/cobro.esquema.test.ts`, que **no prueba el modelo sino que el
+modelo y el esquema siguen hablando de lo mismo**: lee el CHECK de `estado_implementacion`
+y los términos vigentes desde las migraciones, y los compara con el código. El riesgo del
+código en espera no es que esté mal, es que **se pudra en silencio**; esa guarda avisa
+cuando deja de servir en vez de descubrirlo el día que se necesita.
+
 ### 9.7 Pendientes
 
 1. **El barrido en diferido.** Hoy los tres intentos son en línea, dentro de la llamada
@@ -1448,3 +1493,18 @@ dio verde sobre algo falso.
 6. **`RESTRINGIDA` en el enum de `suscripcion_eventos`** pertenece al vocabulario de
    gating, no al comercial, así que el trigger nunca lo emite. Decidir si se registra
    cuando se aplica una bandera o si sale del enum.
+
+7. **Firmar una suscripción desde el panel.** Es lo que desbloquea el modelo de cobro
+   entero de una vez (§9.9), y arregla dos cosas que hoy no se ven: un contrato que nace
+   por SQL deja su evento `CREADA` **sin `admin_id`** —o sea que la auditoría de `010` no
+   cubre el momento en que se firma, que es el que más importa— y con cincuenta clientes
+   cargar cada alta por el SQL Editor no existe, que es el mismo argumento que volvió
+   requisito a las plantillas de §6.
+
+   Va último en la lista pero **no es lo último en prioridad**: los números de esta lista
+   son posiciones, no identificadores, y se conservan de arriba hacia abajo justamente
+   porque hay comentarios en el código que citan un ítem por su número. (`013` dice
+   «cierra §9.7-4» y se refiere a **el `motivo` de un cambio de estado**, que hoy es el 5:
+   la lista ya creció una vez por arriba. Citar por número no funciona; se deja anotado en
+   lugar de editar una migración aplicada.)
+
