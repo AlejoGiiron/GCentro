@@ -116,3 +116,45 @@ describe('las propiedades que el modelo promete siguen en pie', () => {
     }
   })
 })
+
+describe('la condición de disparo de §9.9 sigue siendo la que dice el documento', () => {
+  it('firmar un ANUAL deja la implementación en un estado que exige un paso posterior', () => {
+    // §9.9: el daño es LATENTE porque las tres suscripciones vivas están en
+    // estado terminal. Deja de serlo **al firmar el primer anual**: ese
+    // contrato nace `exonerada_condicional`, que NO es firme, y a los doce
+    // meses alguien tiene que moverlo. Hoy no hay quién.
+    //
+    // Este test fija esa cadena. Si algún día firmar un anual dejara de
+    // producir un estado pendiente de confirmación, el pendiente de §9.9
+    // dejaría de tener sentido y hay que reescribirlo, no borrarlo callado.
+    const alFirmar = implementacionAlFirmar(12)
+    expect(alFirmar).toBe('exonerada_condicional')
+    expect(transicionImplementacion(alFirmar, { tipo: 'ANIVERSARIO_ANUAL' })).toBe('exonerada')
+
+    // Y que no llegue solo: ningún otro evento lo vuelve firme.
+    const otros = [
+      { tipo: 'CAMBIO_TERMINO', nuevo_termino_meses: 1 },
+      { tipo: 'CANCELACION' },
+    ] as const
+    for (const e of otros) {
+      expect(transicionImplementacion(alFirmar, e), e.tipo).not.toBe('exonerada')
+    }
+  })
+
+  it('nadie llama todavía a `transicionImplementacion`: el pendiente sigue abierto', () => {
+    // ⚠️ ESTE TEST ESTÁ HECHO PARA FALLAR ALGÚN DÍA, y esa es su función.
+    //
+    // §9.9 afirma que el modelo no tiene consumidor. Una afirmación así se
+    // pudre sola: alguien escribe el primer llamador, el documento sigue
+    // diciendo que no existe, y nadie se entera. Cuando este test falle,
+    // el consumidor existe — actualizar §9.9 y borrar este test.
+    const archivos = readdirSync('src', { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+      // Se excluye por SUFIJO y no por ruta exacta: en Windows `readdirSync`
+      // devuelve los separadores al revés y la comparación no coincidiría.
+      .filter((f) => !f.endsWith('cobro.ts'))
+      .filter((f) => readFileSync(`src/${f}`, 'utf8').includes('transicionImplementacion'))
+
+    expect(archivos, 'apareció un consumidor: §9.9 quedó vieja').toEqual([])
+  })
+})

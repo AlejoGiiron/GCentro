@@ -1446,10 +1446,17 @@ De ahí se siguen las dos consecuencias que parecían problemas distintos:
 > `exonerada`, también terminal. **Las tres suscripciones están en estado terminal**, así
 > que `transicionImplementacion` las devolvería sin cambios aunque corriera.
 
-**Condición de disparo: el primer contrato ANUAL.** Ese día la suscripción nace
-`exonerada_condicional`, y doce meses después nadie la pasa a `exonerada` — la
-implementación queda condicionalmente perdonada para siempre y sigue siendo reclamable.
-No es «algún día»: es el día que se firme un anual.
+**Condición de disparo: AL FIRMAR EL PRIMER ANUAL.** No «algún día», no «cuando pase
+el año»: el día de la firma. Ese contrato nace `exonerada_condicional`, y doce meses
+después nadie lo pasa a `exonerada` — la implementación queda condicionalmente perdonada
+para siempre y sigue siendo reclamable.
+
+**Y no se construye el consumidor antes de que el caso exista.** Se propuso adelantar la
+pieza que falta —una categoría de atención «cumplió doce meses, falta exonerar» con su
+botón— junto con el alta. Se descartó, y el argumento es el mismo que este documento usa
+para no darle pantalla al cambio de plan: construir la mitad de atrás de un flujo cuya
+mitad de adelante no existe deja código que nadie pudo verificar contra un caso real. El
+día que se firme un anual hay contra qué verificarlo.
 
 #### Mientras tanto: código en espera, con guarda
 
@@ -1462,6 +1469,18 @@ modelo y el esquema siguen hablando de lo mismo**: lee el CHECK de `estado_imple
 y los términos vigentes desde las migraciones, y los compara con el código. El riesgo del
 código en espera no es que esté mal, es que **se pudra en silencio**; esa guarda avisa
 cuando deja de servir en vez de descubrirlo el día que se necesita.
+
+**Esa guarda cubre también lo que esta sección afirma**, y no sólo el esquema:
+
+- Fija la cadena de la condición de disparo — firmar a doce meses da
+  `exonerada_condicional`, sólo `ANIVERSARIO_ANUAL` lo vuelve firme, ningún otro evento
+  llega ahí. Si eso cambiara, este pendiente habría que reescribirlo, y el test obliga a
+  mirarlo en vez de dejarlo mintiendo.
+- Y tiene un **test hecho para fallar algún día**: recorre `src/` y verifica que
+  `transicionImplementacion` **no tiene ningún llamador**. La afirmación «el modelo no
+  tiene consumidor» es exactamente la clase de frase que se pudre sola —alguien escribe
+  el primer llamador y el documento sigue diciendo que no existe—. Cuando ese test falle,
+  el consumidor apareció: se actualiza esta sección y se borra el test.
 
 ### 9.7 Pendientes
 
@@ -1507,4 +1526,23 @@ cuando deja de servir en vez de descubrirlo el día que se necesita.
    «cierra §9.7-4» y se refiere a **el `motivo` de un cambio de estado**, que hoy es el 5:
    la lista ya creció una vez por arriba. Citar por número no funciona; se deja anotado en
    lugar de editar una migración aplicada.)
+
+   **Alcance aprobado (19/08/2026), y lo que quedó explícitamente afuera.** Entra: el
+   alta —cliente nuevo o existente, producto, plan, término, sedes, precios congelados,
+   fecha de inicio— y vincular la organización externa. NO entran el cambio de plan ni el
+   de término: `calcularCambioDePlan` lee `periodo_actual_inicio/fin`, que es el
+   pendiente 2 de esta misma lista, y con esas fechas viejas `diasRestantes` da 0 y el
+   saldo a favor da $0 **sin tirar error** — le come al cliente todo el crédito y muestra
+   un número plausible. Tampoco entra la pieza del aniversario (§9.9).
+
+   Dos dependencias que no dependen del código:
+
+   - **El plan del contador no tiene precio de lista cargado.** El formulario compara
+     contra lista donde hay lista, y donde no hay **lo dice**: «este plan no tiene precio
+     de lista cargado». Parecer que comparó es peor que no comparar.
+   - **Se le pidió a G-Vento un endpoint de lectura** (`organizacion_externa_id` → nombre),
+     como parte de la Fase 2 ya pedida. Sin eso, al vincular no hay forma de comprobar que
+     el UUID pegado es de quien el operador cree: el contrato tiene una sola llamada y
+     **escribe**. Mientras tanto se vincula sólo cuando está en `null` y corregir un
+     vínculo hecho es un camino aparte y explícito.
 
