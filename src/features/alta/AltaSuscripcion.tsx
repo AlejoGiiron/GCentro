@@ -34,7 +34,7 @@ import { FOCO, SENAL, TINTA } from '@/lib/tokens'
 import { implementacionAlFirmar, mensualEfectivo } from '@/lib/cobro'
 import { desvioDeLista, exigeJustificacion, periodoFin, type Desvio } from './derivar'
 import { formularioAltaSchema, type FormularioAlta } from './schemas'
-import { useCatalogo, useFirmar } from './useAlta'
+import { textoDeFalla, useCatalogo, useFirmar } from './useAlta'
 
 const CAMPO =
   'w-full rounded border border-lienzo-divisor bg-lienzo-panel px-2 py-1 text-dato ' +
@@ -513,7 +513,7 @@ export function AltaSuscripcion({ volver, alFirmar }: {
 
         {firmar.isError && (
           <span role="alert" className={`text-micro ${SENAL.critico}`}>
-            No se firmó. {(firmar.error as Error).message}
+            {textoDeFalla(firmar.error)}
           </span>
         )}
       </div>

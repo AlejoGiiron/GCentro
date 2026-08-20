@@ -21,7 +21,7 @@ import { renderToString } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AltaSuscripcion } from './AltaSuscripcion'
 import { formularioAltaSchema } from './schemas'
-import type { Catalogo } from './useAlta'
+import { textoDeFalla, type Catalogo } from './useAlta'
 
 const CATALOGO: Catalogo = {
   productos: [{ id: 'aa000000-0000-4000-8000-000000000001', codigo: 'g-vento', nombre: 'G-Vento' }],
@@ -170,5 +170,31 @@ describe('un contrato sin contraparte no se puede armar', () => {
       precio_base_mensual: 79999.5,
     })
     expect(r.success).toBe(false)
+  })
+})
+
+describe('el doble clic no es un error, y no se muestra como si lo fuera', () => {
+  it('el choque de PK dice que el contrato SÍ se firmó', () => {
+    // El id se decide antes de llamar, así que un 23505 acá significa que el
+    // primer clic funcionó. El texto crudo de Postgres hacía pensar lo
+    // contrario y llevaba a intentar de nuevo.
+    const texto = textoDeFalla({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "suscripciones_pkey"',
+    })
+    expect(texto).toContain('ya se firmó')
+    expect(texto).not.toContain('duplicate key')
+  })
+
+  it('cualquier otro error se muestra crudo', () => {
+    // Inventarle un texto amable a un error que no se anticipó esconde
+    // justamente lo que hay que leer.
+    expect(textoDeFalla(new Error('permission denied for table suscripciones'))).toBe(
+      'permission denied for table suscripciones',
+    )
+  })
+
+  it('algo que no es un Error tampoco rompe la pantalla', () => {
+    expect(textoDeFalla('rarísimo')).toContain('no dice por qué')
   })
 })

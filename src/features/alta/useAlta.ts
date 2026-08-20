@@ -77,6 +77,28 @@ export interface Firma {
   id: string
 }
 
+/**
+ * Qué decirle al operador cuando la firma falla.
+ *
+ * ⚠️ EL CASO QUE IMPORTA ES EL 23505, y no es un error de verdad: es el doble
+ * clic funcionando. El id del contrato se decide antes de llamar, así que el
+ * segundo intento choca contra la PK — o sea que **el contrato SÍ se firmó, y
+ * una sola vez**. Mostrar ahí "duplicate key value violates unique constraint"
+ * hace que alguien crea que no se firmó nada y vuelva a intentar, que es
+ * exactamente lo contrario de lo que pasó.
+ *
+ * Todo lo demás se muestra crudo a propósito: inventarle un texto amable a un
+ * error que no se anticipó esconde justamente lo que hay que leer.
+ */
+export function textoDeFalla(e: unknown): string {
+  const codigo =
+    typeof e === 'object' && e !== null && 'code' in e ? String((e as { code: unknown }).code) : ''
+  if (codigo === '23505') {
+    return 'Ese contrato ya se firmó — el segundo intento no creó nada. Está en la lista.'
+  }
+  return e instanceof Error ? e.message : 'No se firmó, y el error no dice por qué.'
+}
+
 export function useFirmar() {
   const qc = useQueryClient()
   return useMutation({

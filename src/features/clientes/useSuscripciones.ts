@@ -48,7 +48,8 @@ import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
-  descuento_pct, periodo_actual_inicio, periodo_actual_fin,
+  descuento_pct, estado_implementacion, fecha_inicio,
+  periodo_actual_inicio, periodo_actual_fin,
   organizacion_externa_id,
   clientes!inner ( id, nombre_comercial, es_prueba ),
   productos!inner ( codigo, nombre, url_aplicar_estado ),
@@ -140,7 +141,10 @@ export function useSuscripciones() {
             sugerencia,
             bandera,
             cobertura,
-            atencion: clasificar(sugerencia.nivel, bandera, s.estado, cobertura, hoy),
+            atencion: clasificar(sugerencia.nivel, bandera, s.estado, cobertura, hoy, {
+              estado: s.estado_implementacion,
+              fecha_inicio: s.fecha_inicio,
+            }),
           }
         })
         .sort((a, b) =>

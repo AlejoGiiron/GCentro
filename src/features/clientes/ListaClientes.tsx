@@ -61,6 +61,7 @@ const ATENCION: Record<Atencion, { texto: string; clase: string }> = {
   SIN_PUENTE: { texto: 'sin puente', clase: TINTA.media },
   SIN_HISTORIAL: { texto: 'sin historial de pagos', clase: SENAL.info },
   FALTA_ESCALAR: { texto: 'falta escalar', clase: SENAL.info },
+  IMPLEMENTACION_POR_EXONERAR: { texto: 'falta exonerar', clase: SENAL.info },
   POR_VENCER: { texto: 'vence pronto', clase: TINTA.media },
   AL_DIA: { texto: '', clase: '' },
 }

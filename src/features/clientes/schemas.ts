@@ -23,6 +23,11 @@ export const suscripcionListaSchema = z.object({
   precio_base_mensual: z.number().int(),
   precio_sede_adicional: z.number().int(),
   descuento_pct: z.number().int(),
+  // Los dos hacen falta para la categoría del aniversario: el estado dice si
+  // hay algo pendiente y `fecha_inicio` dice desde cuándo se cuentan los doce
+  // meses. Se cuenta desde el inicio del SERVICIO, no desde `creado_en`.
+  estado_implementacion: z.string(),
+  fecha_inicio: z.string(),
   periodo_actual_inicio: z.string(),
   periodo_actual_fin: z.string(),
   organizacion_externa_id: z.string().uuid().nullable(),

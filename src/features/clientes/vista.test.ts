@@ -73,6 +73,8 @@ function fila(o: {
       precio_base_mensual: 80000,
       precio_sede_adicional: 60000,
       descuento_pct: 0,
+      estado_implementacion: 'cobrada',
+      fecha_inicio: '2026-01-01',
       periodo_actual_inicio: '2026-08-01',
       periodo_actual_fin: '2026-08-31',
       organizacion_externa_id: '12b53bae-a4f7-4076-80f9-8f9288bd0567',
@@ -161,7 +163,7 @@ describe('clasificar', () => {
     }
   })
 
-  it('las ocho categorías son alcanzables: ninguna es código muerto', () => {
+  it('las nueve categorías son alcanzables: ninguna es código muerto', () => {
     const vistas = new Set<Atencion>()
     const banderas = [
       ...NIVELES.map((nv) => confirmada(nv)),
@@ -179,6 +181,14 @@ describe('clasificar', () => {
       for (const b of banderas)
         for (const e of estados)
           for (const c of cobs) vistas.add(clasificar(sugerido, b, e, c, HOY))
+    // La del aniversario necesita el dato de implementación, que es opcional
+    // en la firma: sin él, esa rama no se puede alcanzar nunca.
+    vistas.add(
+      clasificar('activa', confirmada('activa'), 'activa', cobs[2], HOY, {
+        estado: 'exonerada_condicional',
+        fecha_inicio: '2025-01-01',
+      }),
+    )
     expect(vistas.size).toBe(ORDEN_ATENCION.length)
   })
 
@@ -247,6 +257,7 @@ describe('perjudicar a quien pagó pesa más que no cobrarle a quien debe', () =
       'SIN_PUENTE',
       'SIN_HISTORIAL',
       'FALTA_ESCALAR',
+      'IMPLEMENTACION_POR_EXONERAR',
       'POR_VENCER',
       'AL_DIA',
     ])
@@ -425,5 +436,45 @@ describe('contarAtencion', () => {
 
   it('cero cuando no hay nada que atender', () => {
     expect(contarAtencion([fila({ atencion: 'AL_DIA' })], true)).toEqual({ visibles: 0, ocultos: 0 })
+  })
+})
+
+describe('la implementación que cumplió el año (§9.9)', () => {
+  const AL_DIA: Cobertura = {
+    cubierto_hasta: '2026-12-31',
+    ultimo_pago: '2026-08-01',
+    pagos_registrados: 1,
+    proximo_cobro: '2027-01-01',
+  }
+  const anual = (estado: string, fecha_inicio: string) =>
+    clasificar('activa', confirmada('activa'), 'activa', AL_DIA, HOY, { estado, fecha_inicio })
+
+  it('a los doce meses cumplidos, avisa', () => {
+    expect(anual('exonerada_condicional', '2025-08-16')).toBe('IMPLEMENTACION_POR_EXONERAR')
+  })
+
+  it('un día antes del año, todavía no', () => {
+    // El aviso tiene que aparecer cuando la exoneración es EXIGIBLE, no antes:
+    // exonerar temprano regala la implementación de un contrato que todavía
+    // puede bajar de término y volverla exigible (§9.3).
+    expect(anual('exonerada_condicional', '2025-08-17')).toBe('AL_DIA')
+  })
+
+  it('los tres estados que no tienen nada pendiente no avisan', () => {
+    for (const e of ['pendiente', 'cobrada', 'exonerada']) {
+      expect(anual(e, '2020-01-01'), e).toBe('AL_DIA')
+    }
+  })
+
+  it('no le gana a nada que tenga efecto sobre el cliente hoy', () => {
+    // Un contrato con el año cumplido Y una regresión aplicada muestra la
+    // regresión: la implementación es un estado viejo, la regresión es daño
+    // en curso.
+    expect(
+      clasificar('activa', confirmada('suspendida'), 'activa', AL_DIA, HOY, {
+        estado: 'exonerada_condicional',
+        fecha_inicio: '2020-01-01',
+      }),
+    ).toBe('REGRESION_APLICADA')
   })
 })

@@ -8,6 +8,7 @@
  * regla que nadie verifica.
  * ─────────────────────────────────────────────────────────────────────────
  */
+import { addMonths, differenceInCalendarDays, parseISO } from 'date-fns'
 import type { EstadoComercial, FechaISO, Nivel, Sugerencia } from '@/lib/bandera'
 import { pagoSinReactivar, type Cobertura } from '@/lib/cobertura'
 import type { SuscripcionLista } from './schemas'
@@ -97,6 +98,20 @@ export type Atencion =
   | 'SIN_HISTORIAL'
   /** 5 · Habría que escalar y no se hizo. Fuga de plata, sin daño al cliente. */
   | 'FALTA_ESCALAR'
+  /**
+   * 6 · **Cumplió los doce meses y la implementación sigue condicional.**
+   *
+   * Un anual nace `exonerada_condicional` (§9.3): la implementación está
+   * perdonada MIENTRAS dure la permanencia. Al completar el año se vuelve
+   * firme —`exonerada`— y deja de ser reclamable para siempre.
+   *
+   * Nadie hace esa transición sola (§4: nada escala solo, y esto tampoco
+   * desescala solo). Sin este aviso, el contrato queda diciendo «condicional»
+   * indefinidamente, y el día que cambie de término la implementación se
+   * volvería exigible **sobre un cliente que ya cumplió su parte**. O sea: el
+   * riesgo no es perder plata, es cobrarle a quien no corresponde.
+   */
+  | 'IMPLEMENTACION_POR_EXONERAR'
   /** 6 · Trabajo por hacer, sin urgencia. */
   | 'POR_VENCER'
   /** 7 · Silencio. */
@@ -109,6 +124,7 @@ export const ORDEN_ATENCION: Atencion[] = [
   'SIN_PUENTE',
   'SIN_HISTORIAL',
   'FALTA_ESCALAR',
+  'IMPLEMENTACION_POR_EXONERAR',
   'POR_VENCER',
   'AL_DIA',
 ]
@@ -122,12 +138,33 @@ export const SEVERIDAD: Record<Nivel, number> = {
   suspendida: 4,
 }
 
+/**
+ * ¿Cumplió los doce meses de servicio con la implementación todavía condicional?
+ *
+ * El aniversario se cuenta desde `fecha_inicio` —el día que empezó el
+ * servicio— y no desde `creado_en`, que es cuándo se cargó la fila. Un
+ * contrato firmado en papel en enero y cargado en marzo cumple en enero.
+ *
+ * Sólo mira `exonerada_condicional`: los otros tres estados no tienen nada
+ * pendiente. `pendiente` se cobra por la vía normal, y los dos terminales no
+ * se mueven ante ningún evento.
+ */
+export function implementacionPorExonerar(
+  estadoImplementacion: string,
+  fechaInicio: FechaISO,
+  hoy: FechaISO,
+): boolean {
+  if (estadoImplementacion !== 'exonerada_condicional') return false
+  return differenceInCalendarDays(parseISO(hoy), addMonths(parseISO(fechaInicio), 12)) >= 0
+}
+
 export function clasificar(
   sugerido: Nivel,
   b: EstadoBandera,
   estado: EstadoComercial,
   cobertura: Cobertura,
   hoy: FechaISO,
+  implementacion?: { estado: string; fecha_inicio: FechaISO },
 ): Atencion {
   // Antes que todo: hay plata registrada que cubre y el estado igual
   // restringe. Es nuestro error, la evidencia está en nuestra base, y el
@@ -150,6 +187,15 @@ export function clasificar(
   // del puente porque una bandera rota duele más que un dato que falta.
   if (cobertura.proximo_cobro === null) return 'SIN_HISTORIAL'
   if (SEVERIDAD[sugerido] > SEVERIDAD[aplicado]) return 'FALTA_ESCALAR'
+  // Va DESPUÉS de todo lo que tiene efecto sobre el cliente hoy: no hay daño
+  // en curso, hay un estado que quedó viejo. Pero antes de `POR_VENCER`
+  // porque tiene consecuencia de plata y `POR_VENCER` es sólo agenda.
+  if (
+    implementacion !== undefined &&
+    implementacionPorExonerar(implementacion.estado, implementacion.fecha_inicio, hoy)
+  ) {
+    return 'IMPLEMENTACION_POR_EXONERAR'
+  }
   if (sugerido === 'por_vencer') return 'POR_VENCER'
   return 'AL_DIA'
 }
@@ -170,7 +216,7 @@ export type Vista = 'hoy' | 'facturacion' | 'todas'
 
 export const ATENCION_DE_VISTA: Record<Vista, Atencion[] | null> = {
   hoy: ['PAGO_SIN_REACTIVAR', 'REGRESION_APLICADA', 'SIN_CONFIRMAR', 'SIN_PUENTE', 'SIN_HISTORIAL'],
-  facturacion: ['FALTA_ESCALAR', 'POR_VENCER'],
+  facturacion: ['FALTA_ESCALAR', 'IMPLEMENTACION_POR_EXONERAR', 'POR_VENCER'],
   todas: null,
 }
 
