@@ -94,6 +94,16 @@ describe('el formulario de alta se abre sin decidir nada', () => {
     expect(html).toContain('Revisar antes de firmar')
   })
 
+  it('la casilla de cliente de prueba existe y NO viene marcada', () => {
+    // El modo de fallo es asimétrico: un cliente que nace de prueba por error
+    // deja de facturarse y nadie lo nota, mientras que uno real marcado por
+    // error aparece igual en la lista. Por eso el default es no marcada — el
+    // mismo argumento que el `default false` de la columna (§3).
+    const html = montar()
+    expect(html).toContain('Es un cliente de prueba')
+    expect(html).toMatch(/type="checkbox"(?![^>]*checked)/)
+  })
+
   it('dice que los precios se congelan, antes de que se escriban', () => {
     expect(montar()).toContain('se congelan al firmar')
   })
@@ -113,6 +123,7 @@ describe('un contrato sin contraparte no se puede armar', () => {
     descuento_pct: 0,
     fecha_inicio: '2026-08-20',
     motivo: '',
+    cliente_nuevo_es_prueba: false,
   }
 
   it('sin cliente elegido ni nombre nuevo, no valida', () => {
@@ -139,6 +150,17 @@ describe('un contrato sin contraparte no se puede armar', () => {
         cliente_id: 'cc000000-0000-4000-8000-000000000001',
       }).success,
     ).toBe(true)
+  })
+
+  it('si nadie toca la casilla, el cliente nace visible para la cobranza', () => {
+    // Omitir el campo tiene que dar `false`, no `undefined`: un undefined
+    // llegaría al insert y la columna pondría su propio default — que hoy
+    // coincide, pero hace que el formulario dependa de un default de la base
+    // en vez de decir lo que quiere.
+    const sinCasilla: Record<string, unknown> = { ...base, cliente_nuevo: 'Nuevo' }
+    delete sinCasilla.cliente_nuevo_es_prueba
+    const r = formularioAltaSchema.safeParse(sinCasilla)
+    expect(r.success && r.data.cliente_nuevo_es_prueba).toBe(false)
   })
 
   it('un precio con decimales no entra: los pesos son enteros (§2)', () => {

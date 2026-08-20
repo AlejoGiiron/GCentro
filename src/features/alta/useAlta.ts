@@ -93,7 +93,14 @@ export function useFirmar() {
       if (clienteId === null) {
         const { data, error } = await supabase
           .from('clientes')
-          .insert({ nombre_comercial: form.cliente_nuevo.trim() })
+          .insert({
+            nombre_comercial: form.cliente_nuevo.trim(),
+            // Va en el INSERT y no en un UPDATE posterior: si dependiera de
+            // que alguien se acuerde de correrlo, no sería una garantía. Un
+            // cliente de laboratorio creado sin esto entra a las vistas de
+            // cobranza mezclado con los que pagan.
+            es_prueba: form.cliente_nuevo_es_prueba,
+          })
           .select('id')
           .single()
         if (error) throw error

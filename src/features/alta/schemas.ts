@@ -62,6 +62,16 @@ export const formularioAltaSchema = z
     // dos cosas, y nunca ninguna — lo resuelve el `superRefine` de abajo.
     cliente_id: z.string().uuid().nullable(),
     cliente_nuevo: z.string().trim().max(120).default(''),
+    /**
+     * ⚠️ DEFAULT `false`, y por el mismo motivo que la columna (§3): el modo
+     * de fallo tiene que ser «aparece aunque no debería», nunca «no aparece y
+     * nadie lo nota». Un cliente que nace invisible para la cobranza por un
+     * olvido no se descubre — deja de facturarse y ya.
+     *
+     * Sólo aplica al cliente NUEVO. Marcar como prueba a un cliente existente
+     * es otra operación, sobre datos que ya existen, y no entra por acá.
+     */
+    cliente_nuevo_es_prueba: z.boolean().default(false),
 
     producto_id: z.string().uuid({ message: 'Elegí un producto.' }),
     plan_id: z.string().uuid({ message: 'Elegí un plan.' }),

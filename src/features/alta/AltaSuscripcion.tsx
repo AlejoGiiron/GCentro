@@ -47,6 +47,7 @@ const TITULO_SECCION = 'mb-3 text-micro font-semibold uppercase tracking-grupo t
 const VACIO: FormularioAlta = {
   cliente_id: null,
   cliente_nuevo: '',
+  cliente_nuevo_es_prueba: false,
   producto_id: '',
   plan_id: '',
   termino: '',
@@ -222,6 +223,24 @@ export function AltaSuscripcion({ volver, alFirmar }: {
               <p className={`mt-1 text-micro ${TINTA.debil}`}>
                 NIT, razón social y contacto se completan después: no frenan una firma.
               </p>
+
+              {/* Sin marcar por default: un cliente que nace invisible para la
+                  cobranza por un olvido no se descubre, deja de facturarse. */}
+              <label className="mt-3 flex items-start gap-2 text-dato text-tinta-fuerte">
+                <input
+                  type="checkbox"
+                  className={`mt-0.5 ${FOCO}`}
+                  checked={form.cliente_nuevo_es_prueba}
+                  onChange={(e) => set('cliente_nuevo_es_prueba', e.target.checked)}
+                />
+                <span>
+                  Es un cliente de prueba
+                  <span className={`block text-micro ${TINTA.debil}`}>
+                    Queda fuera de las vistas de cobranza. Para laboratorio, no para un
+                    cliente real que todavía no paga.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
         </section>
@@ -446,6 +465,12 @@ export function AltaSuscripcion({ volver, alFirmar }: {
               vincular la organización de G-Vento.
             </li>
             <li>No queda paga: aparece pendiente hasta que se registre el primer pago.</li>
+            {form.cliente_id === null && form.cliente_nuevo_es_prueba && (
+              <li className={SENAL.alerta}>
+                El cliente se crea como <strong>de prueba</strong>: no va a aparecer en la
+                cobranza.
+              </li>
+            )}
           </ul>
         </section>
       )}
