@@ -346,9 +346,21 @@ begin
     raise exception 'la correccion no dejo su evento (n=%)', n;
   end if;
 
+  -- ⚠️ NO se pide "el ultimo por creado_en". El default de esa columna es
+  -- `now()`, que en Postgres es el instante de la TRANSACCION y no el de la
+  -- sentencia: los dos eventos de este bloque tienen el mismo timestamp al
+  -- microsegundo y el `order by ... desc` devuelve cualquiera de los dos. El
+  -- primer intento de esta verificacion fallaba por eso, comparando el evento
+  -- equivocado.
+  --
+  -- Se pide POR LO QUE ES: el evento de correccion es el que tiene vinculo
+  -- anterior. Ademas es la asercion mas fuerte — dice de donde a donde.
   select * into ev from public.suscripcion_eventos
    where suscripcion_id = v_sus and tipo = 'ORGANIZACION_VINCULADA'
-   order by creado_en desc limit 1;
+     and datos ->> 'anterior' is not null;
+  if not found then
+    raise exception 'la correccion no dejo evento con vinculo anterior';
+  end if;
   if (ev.datos ->> 'anterior')::uuid <> v_org or (ev.datos ->> 'nueva')::uuid <> v_otra then
     raise exception 'el evento de correccion no registro el cambio: %', ev.datos;
   end if;

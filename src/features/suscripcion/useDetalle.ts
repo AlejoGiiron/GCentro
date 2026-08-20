@@ -39,6 +39,14 @@ export function useHistorial(suscripcionId: string) {
           .select(SELECT_EVENTOS)
           .eq('suscripcion_id', suscripcionId)
           .order('creado_en', { ascending: false })
+          // ⚠️ El orden entre eventos de la MISMA transacción no está
+          // definido: `creado_en` usa `now()`, que es el instante de la
+          // transacción y no el de la sentencia, así que dos eventos escritos
+          // juntos tienen el mismo timestamp al microsegundo. Hoy no pasa
+          // —cada request de supabase-js es su propia transacción y ninguna
+          // RPC escribe dos eventos—, pero el día que una lo haga, el
+          // historial los va a mostrar en cualquier orden. Lo destapó el
+          // bloque de verificación de la `016`.
           // Acotado: el historial completo de un contrato viejo puede ser
           // largo y la pantalla muestra lo reciente. Si hace falta el resto,
           // es una pantalla de auditoría, no ésta.
