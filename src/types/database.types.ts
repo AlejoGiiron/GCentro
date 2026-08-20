@@ -635,6 +635,33 @@ export type Database = {
         Args: { p_estado: string; p_motivo?: string; p_suscripcion_id: string }
         Returns: undefined
       }
+      corregir_organizacion_externa: {
+        Args: {
+          p_motivo: string
+          p_organizacion: string
+          p_suscripcion_id: string
+        }
+        Returns: undefined
+      }
+      crear_suscripcion: {
+        Args: {
+          p_cliente_id: string
+          p_descuento_pct: number
+          p_estado_implementacion: string
+          p_fecha_inicio: string
+          p_id: string
+          p_monto_implementacion: number
+          p_motivo?: string
+          p_periodo_actual_fin: string
+          p_plan_id: string
+          p_precio_base_mensual: number
+          p_precio_sede_adicional: number
+          p_producto_id: string
+          p_sedes_adicionales: number
+          p_termino: string
+        }
+        Returns: string
+      }
       es_admin: { Args: never; Returns: boolean }
     }
     Enums: {
