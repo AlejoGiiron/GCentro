@@ -26,6 +26,10 @@ import { Rutas } from './rutas'
 const NAVEGACION = [
   { a: RUTAS.lista, texto: 'Suscripciones' },
   { a: RUTAS.cola, texto: 'Cola de banderas' },
+  // Va en la navegación y no como botón dentro de la lista: firmar no es una
+  // acción SOBRE un contrato existente, y colgarla de la pantalla que los
+  // lista la haría parecer una.
+  { a: RUTAS.alta, texto: 'Firmar' },
 ]
 
 /**

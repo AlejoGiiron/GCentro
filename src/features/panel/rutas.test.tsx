@@ -63,12 +63,20 @@ describe('las rutas se montan por el camino real', () => {
     expect(html).toContain('Cargando')
   })
 
+  it('/alta → el formulario de firma', () => {
+    // `Alta` usa `useNavigate`, y el formulario llama a `crypto.randomUUID()`
+    // en el primer render para fijar el id del contrato. Las dos cosas son
+    // dependencias del entorno que sólo se ven montando.
+    const html = montarEn('#/alta')
+    expect(html).toContain('Cargando el catálogo')
+  })
+
   it('una ruta inventada redirige a la lista sin tirar', () => {
     expect(() => montarEn('#/no-existe')).not.toThrow()
   })
 
   it('ninguna ruta tira en el primer render', () => {
-    for (const h of ['#/', '#/cola', '#/suscripcion/x', '#/no-existe', '']) {
+    for (const h of ['#/', '#/cola', '#/alta', '#/suscripcion/x', '#/no-existe', '']) {
       expect(() => montarEn(h), `ruta ${h || '(vacía)'}`).not.toThrow()
     }
   })

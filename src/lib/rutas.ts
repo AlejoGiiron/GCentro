@@ -6,4 +6,5 @@ export const RUTAS = {
   lista: '/',
   suscripcion: (id: string) => `/suscripcion/${id}`,
   cola: '/cola',
+  alta: '/alta',
 } as const

@@ -19,6 +19,7 @@ import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-do
 import { ListaClientes } from '@/features/clientes/ListaClientes'
 import { useSuscripciones } from '@/features/clientes/useSuscripciones'
 import { ColaBanderas } from '@/features/cola/ColaBanderas'
+import { AltaSuscripcion } from '@/features/alta/AltaSuscripcion'
 import { DetalleSuscripcion } from '@/features/suscripcion/DetalleSuscripcion'
 import { RUTAS } from '@/lib/rutas'
 import { SENAL } from '@/lib/tokens'
@@ -75,12 +76,28 @@ function Detalle() {
   return <DetalleSuscripcion fila={fila} volver={() => navegar(RUTAS.lista)} />
 }
 
+/**
+ * Después de firmar se cae en el DETALLE del contrato nuevo, no de vuelta en
+ * el formulario: el operador tiene que ver lo que creó, con lo que le falta
+ * arriba —vincular la organización y registrar el primer pago—.
+ */
+function Alta() {
+  const navegar = useNavigate()
+  return (
+    <AltaSuscripcion
+      volver={() => navegar(RUTAS.lista)}
+      alFirmar={(id) => navegar(RUTAS.suscripcion(id), { replace: true })}
+    />
+  )
+}
+
 export function Rutas() {
   return (
     <Routes>
       <Route path={RUTAS.lista} element={<Lista />} />
       <Route path="/suscripcion/:id" element={<Detalle />} />
       <Route path={RUTAS.cola} element={<ColaBanderas />} />
+      <Route path={RUTAS.alta} element={<Alta />} />
       {/* Cualquier otra cosa vuelve a la lista, sin dejar la ruta rota en el
           historial: `replace` evita que «atrás» reintente la ruta inválida. */}
       <Route path="*" element={<Navigate to={RUTAS.lista} replace />} />
