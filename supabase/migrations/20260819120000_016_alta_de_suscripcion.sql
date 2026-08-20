@@ -24,6 +24,13 @@
 -- precio pactado viaja por un GUC que sólo una RPC puede setear, y el bloqueo
 -- de re-vinculación tiene que vivir en la base o no es una garantía.
 
+-- ⚠️ LA LISTA DE COLUMNAS DEL INSERT SALE DE LOS TIPOS GENERADOS, no del
+-- `create table` de la `003`. El primer intento de esta migración se escribió
+-- leyendo esa tabla y falló al aplicarse contra la base: la `006` había
+-- agregado `monto_implementacion` NOT NULL sin default, y la `015` había
+-- borrado `proximo_cobro`. Un `create table` de hace nueve migraciones
+-- describe el pasado. Lo cubre `src/lib/cobro.esquema.test.ts`.
+
 begin;
 
 -- ── 1. Tipo de evento nuevo ───────────────────────────────────────────────
@@ -71,6 +78,7 @@ begin
       'precio_base_mensual',   new.precio_base_mensual,
       'precio_sede_adicional', new.precio_sede_adicional,
       'descuento_pct',         new.descuento_pct,
+      'monto_implementacion',  new.monto_implementacion,
       'fecha_inicio',          new.fecha_inicio,
       'estado_implementacion', new.estado_implementacion
     ),
@@ -159,6 +167,7 @@ create or replace function public.crear_suscripcion(
   p_precio_base_mensual    integer,
   p_precio_sede_adicional  integer,
   p_descuento_pct          smallint,
+  p_monto_implementacion   integer,
   p_fecha_inicio           date,
   p_periodo_actual_fin     date,
   p_estado_implementacion  text,
@@ -175,11 +184,15 @@ begin
   insert into public.suscripciones (
     id, cliente_id, producto_id, plan_id, termino, sedes_adicionales,
     precio_base_mensual, precio_sede_adicional, descuento_pct,
-    fecha_inicio, periodo_actual_inicio, periodo_actual_fin,
-    estado_implementacion
+    monto_implementacion, fecha_inicio, periodo_actual_inicio,
+    periodo_actual_fin, estado_implementacion
   ) values (
     p_id, p_cliente_id, p_producto_id, p_plan_id, p_termino, p_sedes_adicionales,
     p_precio_base_mensual, p_precio_sede_adicional, p_descuento_pct,
+    -- CONGELADO al firmar igual que los precios (`006`): es NOT NULL y no
+    -- tiene default, así que el alta lo tiene que traer sí o sí. Las sedes
+    -- adicionales no pagan implementación.
+    p_monto_implementacion,
     -- El período actual arranca el día de inicio. Son dos columnas y no una
     -- porque el período se va a mover con los ciclos; hoy no lo mueve nadie
     -- y está anotado en §9.7-2.
@@ -270,7 +283,7 @@ begin
   -- 1. El alta deja evento CREADA con la foto de lo congelado.
   perform public.crear_suscripcion(
     v_sus, v_cliente, v_producto, v_plan, 'anual', 0::smallint,
-    80000, 60000, 30::smallint, date '2026-01-01', date '2026-12-31',
+    80000, 60000, 30::smallint, 250000, date '2026-01-01', date '2026-12-31',
     'exonerada_condicional', 'verificacion de la 016');
 
   select * into ev from public.suscripcion_eventos
@@ -283,6 +296,7 @@ begin
     raise exception 'el motivo no llego al evento: %', ev.motivo;
   end if;
   if (ev.datos ->> 'precio_base_mensual')::int <> 80000
+     or (ev.datos ->> 'monto_implementacion')::int <> 250000
      or ev.datos ->> 'termino' <> 'anual'
      or ev.datos ->> 'estado_implementacion' <> 'exonerada_condicional' then
     raise exception 'la foto de CREADA no coincide con lo insertado: %', ev.datos;

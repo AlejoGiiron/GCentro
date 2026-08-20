@@ -1537,6 +1537,14 @@ cuando deja de servir en vez de descubrirlo el día que se necesita.
 
    Dos dependencias que no dependen del código:
 
+   Y el formulario congela **cinco** números, no cuatro: `precio_base_mensual`,
+   `precio_sede_adicional`, `descuento_pct`, `monto_implementacion` —la
+   implementación, precio de lista 250.000 (`006`)— y el término. Los dos precios
+   de lista contra los que se compara salen de `planes`; el de la implementación
+   está en el comentario de la columna y no en una tabla, así que la comparación
+   contra lista para ese campo es contra una constante del código hasta que se
+   decida dónde vive.
+
    - **El plan del contador no tiene precio de lista cargado.** El formulario compara
      contra lista donde hay lista, y donde no hay **lo dice**: «este plan no tiene precio
      de lista cargado». Parecer que comparó es peor que no comparar.

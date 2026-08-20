@@ -158,3 +158,42 @@ describe('la condición de disparo de §9.9 sigue siendo la que dice el document
     expect(archivos, 'apareció un consumidor: §9.9 quedó vieja').toEqual([])
   })
 })
+
+describe('el alta escribe todas las columnas que la base exige', () => {
+  /**
+   * ⚠️ ESTE TEST EXISTE PORQUE EL DEFECTO YA OCURRIÓ (19/08/2026).
+   *
+   * La `016` se escribió leyendo el `create table` de la `003` y tomándolo
+   * por el esquema actual. No lo es: la `006` agregó `monto_implementacion`
+   * NOT NULL y sin default, y la `015` borró `proximo_cobro`. **Un
+   * `create table` de hace nueve migraciones no describe la tabla de hoy** —
+   * el alta falló al aplicarse, contra la base, con violación de NOT NULL.
+   *
+   * Acá SÍ se leen los tipos generados y no las migraciones, al revés que el
+   * resto del archivo, y la diferencia es a propósito: la pregunta no es "qué
+   * se acordó" sino "qué exige la base HOY para poder insertar". Eso es
+   * exactamente lo que `database.types.ts` sabe y una migración suelta no.
+   */
+  it('la RPC de la 016 cubre todo lo obligatorio de `suscripciones`', () => {
+    const migracion = sql('016_alta_de_suscripcion')
+    const insert = migracion.match(
+      /insert into public\.suscripciones \(([\s\S]*?)\) values/,
+    )
+    expect(insert, 'no se encontró el insert en la 016').not.toBeNull()
+
+    const escribe = insert![1]
+      .split(/[\s,]+/)
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0 && !c.startsWith('--'))
+
+    const tipos = readFileSync('src/types/database.types.ts', 'utf8')
+    const desde = tipos.indexOf('      suscripciones: {')
+    const bloque = tipos.slice(tipos.indexOf('Insert:', desde), tipos.indexOf('Update:', desde))
+
+    // Sin `?` = la base lo exige: NOT NULL y sin default.
+    const obligatorias = [...bloque.matchAll(/^\s{10}([a-z_]+):/gm)].map((m) => m[1])
+    expect(obligatorias.length, 'no se pudo leer el Insert de suscripciones').toBeGreaterThan(3)
+
+    expect(escribe.filter((c) => obligatorias.includes(c)).sort()).toEqual(obligatorias.sort())
+  })
+})
