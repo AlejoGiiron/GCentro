@@ -101,6 +101,12 @@ export function EditorMensaje({
   const largo = largoEfectivo(valor)
   const excedido = largo > MENSAJE_MAX
   const restantes = MENSAJE_MAX - largo
+  // ⚠️ DERIVADOS del límite, no constantes sueltas. Estaban escritos como 140
+  // y 60 —la mitad y un quinto de 280— y al bajar el límite a 140 dejaron de
+  // significar eso: el contador se habría quedado pegado en "quedan N" desde
+  // el primer carácter y el aviso naranja no habría aparecido nunca.
+  const MOSTRAR_CONTADOR = Math.round(MENSAJE_MAX / 2)
+  const CERCA = Math.round(MENSAJE_MAX / 5)
 
   return (
     <div className="space-y-2">
@@ -109,17 +115,17 @@ export function EditorMensaje({
           <MessageSquare size={11} className="mr-1 inline" aria-hidden="true" />
           Mensaje del banner
         </label>
-        {/* El contador aparece cuando importa. Un "0/280" desde el principio
+        {/* El contador aparece cuando importa. Un "0/140" desde el principio
             es ruido; a partir de la mitad es información. */}
         <span
           className={`text-micro tabular-nums ${
-            excedido ? SENAL.critico : restantes <= 60 ? SENAL.alerta : TINTA.debil
+            excedido ? SENAL.critico : restantes <= CERCA ? SENAL.alerta : TINTA.debil
           }`}
           aria-live="polite"
         >
           {excedido
             ? `${largo - MENSAJE_MAX} de más`
-            : restantes <= 140
+            : restantes <= MOSTRAR_CONTADOR
               ? `quedan ${restantes}`
               : `${largo}/${MENSAJE_MAX}`}
         </span>
@@ -157,7 +163,7 @@ export function EditorMensaje({
         rows={3}
         value={valor}
         onChange={(e) => onChange(e.target.value)}
-        // ⚠️ SIN `maxLength`. Cortar la escritura al carácter 280 hace que el
+        // ⚠️ SIN `maxLength`. Cortar la escritura al llegar al límite hace que el
         // texto se pierda sin aviso mientras alguien redacta. Se deja escribir
         // de más, se muestra cuánto sobra, y el botón de enviar se bloquea.
         className={`${CAMPO} ${excedido ? 'border-senal-critico' : ''}`}
@@ -170,8 +176,9 @@ export function EditorMensaje({
 
       {excedido && (
         <p role="alert" className={`text-micro ${SENAL.critico}`}>
-          El límite de {MENSAJE_MAX} es nuestro: G-Vento acepta texto sin límite, pero un
-          banner más largo deja de leerse. Recortá antes de enviar.
+          El límite de {MENSAJE_MAX} es nuestro: G-Vento acepta texto sin límite, pero
+          arriba de eso el banner ocupa más de un renglón y empuja la pantalla de venta.
+          Recortá antes de enviar.
         </p>
       )}
 

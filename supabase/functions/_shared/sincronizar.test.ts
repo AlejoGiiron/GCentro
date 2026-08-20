@@ -124,7 +124,7 @@ describe('ninguna entrada inválida escribe en banderas_pendientes', () => {
     ['valor_deseado con espacio al final', { ...entradaBuena, valor_deseado: 'gracia ' }, 400],
 
     // ── mensaje ── el que se escapó el 14/08/2026 ─────────────────────────
-    ['mensaje de 281 caracteres', { ...entradaBuena, mensaje: 'a'.repeat(MENSAJE_MAX + 1) }, 400],
+    [`mensaje de ${MENSAJE_MAX + 1} caracteres`, { ...entradaBuena, mensaje: 'a'.repeat(MENSAJE_MAX + 1) }, 400],
     ['mensaje de 5000 caracteres', { ...entradaBuena, mensaje: 'a'.repeat(5_000) }, 400],
     ['mensaje que es un número', { ...entradaBuena, mensaje: 42 }, 400],
     ['mensaje que es un objeto', { ...entradaBuena, mensaje: { texto: 'hola' } }, 400],
@@ -145,7 +145,7 @@ describe('ninguna entrada inválida escribe en banderas_pendientes', () => {
     })
   }
 
-  it('el mensaje de EXACTAMENTE 280 sí pasa: el límite no se corrió', async () => {
+  it(`el mensaje de EXACTAMENTE ${MENSAJE_MAX} sí pasa: el límite no se corrió`, async () => {
     // Sin esto, "nada inválido escribe" se podría satisfacer rechazando todo.
     const p = puertoFalso()
     const e = envioFalso()

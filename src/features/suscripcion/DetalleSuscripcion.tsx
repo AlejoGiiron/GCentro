@@ -24,6 +24,7 @@ import { EditorMensaje } from './EditorMensaje'
 import type { FilaLista } from '@/features/clientes/vista'
 import { CONCEPTOS, METODOS, formularioPagoSchema, type Evento, type Pago } from './schemas'
 import { textoDe } from '@/lib/puente-texto'
+import { MENSAJE_MAX } from '@/lib/bandera'
 import {
   useCambiarEstado,
   useConfirmarBandera,
@@ -154,7 +155,7 @@ function ConfirmarBandera({ fila }: { fila: FilaLista }) {
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           className={`${BOTON} bg-lienzo-realce text-tinta-fuerte hover:bg-lienzo-divisor/40`}
-          disabled={confirmar.isPending || mensaje.trim().length > 280}
+          disabled={confirmar.isPending || mensaje.trim().length > MENSAJE_MAX}
           onClick={() => confirmar.mutate({ nivel: sugerencia.nivel, mensaje: mensaje || null })}
         >
           {/* Estado de carga DESDE EL PRIMER CLIC. La primera llamada del día

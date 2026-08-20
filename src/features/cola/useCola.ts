@@ -21,6 +21,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
 import { interpretar, type ResultadoPuente } from '@/lib/puente'
+import { MENSAJE_MAX } from '@/lib/bandera'
 import { filaColaSchema, type FilaCola } from './schemas'
 
 const SELECT = `
@@ -96,6 +97,24 @@ export function useReintentar() {
     meta: { area: 'bandera' },
     mutationKey: ['reintentar-bandera'],
     mutationFn: async (f: FilaCola): Promise<ResultadoPuente> => {
+      // ⚠️ FILAS ANTERIORES AL LÍMITE DE 140 (19/08/2026). Los mensajes ya
+      // guardados no se truncan ni se borran, pero un reintento vuelve a pasar
+      // por la validación del borde y el borde ahora corta en 140. Se detecta
+      // acá para no gastar una llamada —y una fila más en la cola, que crece
+      // por llamada (§5)— en algo que se sabe que va a rebotar.
+      //
+      // El texto dice qué hacer, porque la salida existe: el mensaje se
+      // reescribe desde el detalle de la suscripción.
+      const largo = f.mensaje?.trim().length ?? 0
+      if (largo > MENSAJE_MAX) {
+        return {
+          estado: 'rechazado',
+          mensaje:
+            `El mensaje guardado tiene ${largo} caracteres y el límite bajó a ${MENSAJE_MAX}. ` +
+            'Reenviá desde el detalle de la suscripción con el texto recortado.',
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('sincronizar-bandera', {
         body: {
           suscripcion_id: f.suscripcion_id,

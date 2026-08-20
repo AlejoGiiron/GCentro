@@ -772,7 +772,7 @@ revivir un contrato que alguien terminó a propósito.
 **Una fila en la cola significa "esto hay que aplicarlo y se va a reintentar hasta
 lograrlo".** Un dato inválido no es eso: no se arregla reintentando. Por eso todo lo que
 pueda rechazarse mirando la entrada se rechaza **antes** del insert — nivel desconocido,
-mensaje de más de 280 caracteres o del tipo equivocado, `suscripcion_id` que no es UUID,
+mensaje de más de 140 caracteres o del tipo equivocado, `suscripcion_id` que no es UUID,
 suscripción sin `organizacion_externa_id`, producto sin puente, secreto sin configurar.
 
 El único caso que escribe fila y falla es el que **llegó a la red**, que es exactamente lo
@@ -906,24 +906,46 @@ deliberadas:
   llamadas idénticas dieron `changed:true` y `changed:false` como se esperaba, pero el
   timestamp no era observable desde este lado.
 
-#### El largo del mensaje lo pone G-Centro: 280 caracteres
+#### El largo del mensaje lo pone G-Centro: 140 caracteres
 
 `subscription_message` es `text` sin límite y **G-Vento no lo valida**. Que no haya límite
 técnico no significa que cualquier largo sirva: el campo se renderiza en un banner encima
 de la pantalla de venta, en una tablet apaisada detrás de un mostrador.
 
-- Es el techo natural de **dos frases**. Más que eso ya no es un aviso de cobranza, es una
-  carta — y un banner persistente que nadie termina de leer deja de comunicar y pasa a ser
-  ruido que se aprende a ignorar. Justo cuando §6 dice que el mensaje es *la palanca real*.
-- Entra en dos o tres renglones sin empujar la venta hacia abajo. Un banner que tapa el
-  flujo de trabajo se vuelve un problema del cliente, no presión de cobranza.
-- **El límite tiene que existir de este lado porque del otro no existe.** Un `text` sin
-  límite escrito desde un panel es donde alguien termina pegando un hilo de correo entero,
-  y el que lo ve es el cajero del bar.
+**El número lo midió G-Vento en su propio banner (19/08/2026):** 280 entra, pero ocupa dos
+renglones, y tres a 1024px. 140 entra en **uno solo** desde 1280.
+
+Eso reemplaza al argumento que había acá antes —«el techo natural de dos frases»—, que era
+una estimación hecha sin ver el componente que renderiza el texto. Y no es prolijidad: un
+banner de tres renglones empuja la pantalla de venta hacia abajo, y ahí deja de ser presión
+de cobranza para volverse un problema del cliente. Justo cuando §6 dice que el mensaje es
+*la palanca real*.
+
+**El límite tiene que existir de este lado porque del otro no existe.** Un `text` sin
+límite escrito desde un panel es donde alguien termina pegando un hilo de correo entero, y
+el que lo ve es el cajero del bar.
 
 Es un número de producto y se puede mover. Lo que no se puede es no tenerlo. Vive en
 `MENSAJE_MAX`, y `''` y `null` colapsan los dos a `null`: un string vacío del otro lado
 renderiza un banner en blanco, un rectángulo de color sin texto, que es peor que nada.
+
+**Al bajar de 280 a 140 se movieron tres cosas más, y ninguna era obvia:**
+
+- **Dos de las cinco plantillas no entraban** —`restringida` tenía 177 y `suspendida`
+  209—, o sea que el botón «usar plantilla» ofrecía un texto que el puente iba a rechazar
+  con un 400. No lo impedía nada: no había ningún test sobre las plantillas. Ahora
+  `src/lib/plantillas.test.ts` las pasa por `normalizarMensaje`, que es la misma función
+  que corre en el borde. Al reescribirlas se conservó lo que no es negociable —nombrar qué
+  NO se bloquea, y por dónde escribir—; se perdió adorno.
+- **Los umbrales del contador estaban escritos como números sueltos** (140 y 60, que eran
+  la mitad y un quinto de 280). Con el límite en 140 habrían dejado el contador pegado en
+  «quedan N» desde el primer carácter y el aviso naranja no habría aparecido nunca. Ahora
+  se derivan de `MENSAJE_MAX`.
+- **Los mensajes ya guardados con más de 140 no se truncan ni se borran**, pero un
+  REINTENTO vuelve a pasar por el borde y sería rechazado. La cola lo detecta antes de
+  gastar la llamada y dice qué hacer: reescribir el texto desde el detalle. Se prefirió eso
+  a mantener dos límites para siempre — uno para lo nuevo y otro para lo viejo — que es la
+  clase de cosa que nadie recuerda seis meses después.
 
 **RLS:** legible por los miembros de la organización. Escribible por nadie. Solo la Edge
 Function `aplicar-estado`, con service role, puede tocarla. Los usuarios del cliente no
@@ -1535,6 +1557,15 @@ cuando deja de servir en vez de descubrirlo el día que se necesita.
    saldo a favor da $0 **sin tirar error** — le come al cliente todo el crédito y muestra
    un número plausible. Tampoco entra la pieza del aniversario (§9.9).
 
+   **Lo que las defensas del alta NO cubren, dicho como es.** El formulario compara con
+   la lista, muestra el mensual total antes de congelarlo, exige marcar y justificar
+   cuando el precio se aparta, y deja una foto de lo firmado en el evento `CREADA` que
+   saca el trigger desde `NEW`. Ninguna de esas seis defensas atrapa **$85.000 en vez de
+   $80.000**: es un precio plausible, dentro de rango, que se aparta de la lista tanto
+   como un descuento real. Contra ese error no hay prevención — queda la comparación con
+   la lista, que lo muestra sin poder distinguirlo de una decisión, y la foto, que permite
+   auditarlo después. Está escrito acá para que nadie lo lea como cubierto.
+
    Dos dependencias que no dependen del código:
 
    Y el formulario congela **cinco** números, no cuatro: `precio_base_mensual`,
@@ -1548,9 +1579,23 @@ cuando deja de servir en vez de descubrirlo el día que se necesita.
    - **El plan del contador no tiene precio de lista cargado.** El formulario compara
      contra lista donde hay lista, y donde no hay **lo dice**: «este plan no tiene precio
      de lista cargado». Parecer que comparó es peor que no comparar.
-   - **Se le pidió a G-Vento un endpoint de lectura** (`organizacion_externa_id` → nombre),
-     como parte de la Fase 2 ya pedida. Sin eso, al vincular no hay forma de comprobar que
-     el UUID pegado es de quien el operador cree: el contrato tiene una sola llamada y
-     **escribe**. Mientras tanto se vincula sólo cuando está en `null` y corregir un
-     vínculo hecho es un camino aparte y explícito.
+   - **El endpoint de lectura se pidió y G-Vento lo RECHAZÓ (19/08/2026), con mejor
+     argumento que el pedido:** sería superficie pública permanente —otro endpoint sin
+     JWT, con HMAC como única autenticación— para un problema de copy-paste que ocurre
+     una vez por cliente. Se acepta.
+
+     En su lugar: su script de onboarding ya imprime **nombre y UUID juntos**, en formato
+     copiable, y el paso de vincular pide **las dos cosas**. El operador **escribe** el
+     nombre —no lo elige de una lista, no se autocompleta— y confirma con los dos datos
+     a la vista. Que sea escribir es el punto: obliga a leer el dato en vez de pegarlo,
+     que es exactamente donde se produce el error que se quiere atrapar.
+
+     Sigue sin haber verificación contra G-Vento, y eso no cambió: el contrato tiene una
+     sola llamada y **escribe**. Lo que hay es una segunda lectura humana del mismo dato.
+     Se vincula sólo cuando está en `null`; corregir un vínculo hecho es un camino aparte
+     que exige motivo y queda auditado (`016`).
+
+     **Cuándo se vuelve a pedir el endpoint:** si el alta se vuelve frecuente —del orden
+     de veinte clientes, varios por semana—, la aritmética cambia y el pedido se
+     justifica. Hoy no.
 

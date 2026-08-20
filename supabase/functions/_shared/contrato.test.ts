@@ -174,10 +174,12 @@ describe('normalizarMensaje', () => {
   })
 
   it('el límite lo pone G-Centro: G-Vento acepta text sin límite', () => {
-    // Fijado como test para que quede escrito que el 280 es una decisión de
+    // Fijado como test para que quede escrito que el 140 es una decisión de
     // producto de ESTE lado, no una restricción heredada. Si se mueve, se
-    // mueve a propósito.
-    expect(MENSAJE_MAX).toBe(280)
+    // mueve a propósito. Bajó de 280 el 19/08/2026, con la medición de
+    // G-Vento sobre su propio banner: 280 ocupa dos renglones y tres a
+    // 1024px; 140 entra en uno desde 1280.
+    expect(MENSAJE_MAX).toBe(140)
   })
 })
 

@@ -50,6 +50,16 @@ export interface Plantilla {
  *   momento posible.
  * · **Corto.** Un banner persistente que nadie termina de leer deja de
  *   comunicar y se vuelve ruido que se aprende a ignorar.
+ *
+ * ⚠️ Y AHORA, ADEMÁS, TIENEN QUE ENTRAR EN `MENSAJE_MAX`. Cuando el límite
+ * bajó a 140 (19/08/2026), `restringida` tenía 177 y `suspendida` 209: las dos
+ * ofrecían al operador un texto que el puente iba a rechazar con un 400. Lo
+ * fija `plantillas.test.ts`, que antes no existía — nada garantizaba que una
+ * plantilla entrara en el límite que el mismo repo impone.
+ *
+ * Al reescribirlas se conservó lo que no es negociable: nombrar qué NO se
+ * bloquea —facturar a la DIAN— y decir por dónde escribir. Lo que se perdió
+ * es adorno: «hace varios días», «comunicate con nosotros para reactivarla».
  */
 export const PLANTILLAS: Record<Nivel, Plantilla> = {
   activa: {
@@ -69,13 +79,13 @@ export const PLANTILLAS: Record<Nivel, Plantilla> = {
   },
   restringida: {
     texto:
-      'La suscripción a G-Vento está vencida hace varios días. Reportes y configuración quedan en pausa hasta regularizar; vender y facturar sigue funcionando. Escribinos por WhatsApp.',
+      'La suscripción a G-Vento está vencida. Reportes y configuración quedan en pausa; vender y facturar sigue igual. Escribinos por WhatsApp.',
     intencion:
       'Nombrar exactamente qué se pausó Y qué no. Que el cajero pueda decirle a su jefe qué pasa sin exagerarlo.',
   },
   suspendida: {
     texto:
-      'La suscripción a G-Vento está suspendida por falta de pago. Vender, cobrar y facturar a la DIAN siguen funcionando; la parte administrativa está en pausa. Comunicate con nosotros por WhatsApp para reactivarla.',
+      'Suscripción suspendida por falta de pago. Vender y facturar a la DIAN siguen igual; lo administrativo, en pausa. Escribinos por WhatsApp.',
     intencion:
       'Máxima presión posible sin mentir. Lo que se bloquea es lo administrativo — el nivel más alto de la escalera no impide operar (§6).',
   },

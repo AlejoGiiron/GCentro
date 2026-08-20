@@ -91,7 +91,7 @@ select valor_deseado, intentos, cambio_efectivo, bandera_error_codigo,
 | Código | Qué pasó |
 |---|---|
 | `200` | Se aplicó. `changed:false` = ya estaba así, y no es un error. |
-| `400` | Entrada inválida (nivel desconocido, mensaje > 280, uuid mal). |
+| `400` | Entrada inválida (nivel desconocido, mensaje > 140, uuid mal). |
 | `401` | Sin sesión. |
 | `403` | Con sesión, pero sin fila en `admins`. |
 | `404` | La suscripción no existe. |

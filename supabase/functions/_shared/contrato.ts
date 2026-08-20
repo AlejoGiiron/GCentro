@@ -97,22 +97,28 @@ export function traducirNivel(nivel: string): EstadoProducto {
  * cualquier largo sirva: el campo se renderiza en un banner del POS, encima
  * de la pantalla de venta, en una tablet apaisada detrás de un mostrador.
  *
- * 280 caracteres, por tres razones:
+ * 140 caracteres, y el número lo MIDIÓ G-Vento en su propio banner
+ * (19/08/2026): 280 entra, pero ocupa dos renglones, y tres a 1024px. 140
+ * entra en UNO solo desde 1280.
  *
- * · Es el techo natural de DOS FRASES. Más que eso ya no es un aviso de
- *   cobranza, es una carta — y un banner persistente que nadie termina de
- *   leer deja de comunicar y pasa a ser ruido que se aprende a ignorar.
- * · Entra en dos o tres renglones en pantalla angosta sin empujar la venta
- *   hacia abajo ni obligar a scroll. Un banner que tapa el flujo de trabajo
- *   se convierte en un problema del cliente, no en presión de cobranza.
- * · El límite tiene que existir de este lado porque del otro no existe. Un
- *   `text` sin límite escrito desde un panel es donde alguien termina pegando
- *   un hilo de correo entero, y el que lo ve es el cajero del bar.
+ * Ese dato reemplaza al cálculo que había acá antes —«el techo natural de dos
+ * frases»—, que era una estimación hecha sin ver el componente que lo
+ * renderiza. Un renglón contra tres no es prolijidad: un banner de tres
+ * renglones empuja la pantalla de venta hacia abajo, y ahí deja de ser
+ * presión de cobranza y pasa a ser un problema del cliente.
  *
- * Es un número de producto, no una restricción técnica: se puede mover. Lo
- * que no se puede es no tenerlo.
+ * Lo que no cambió es por qué el límite vive de este lado: G-Vento declara el
+ * campo `text` y no lo valida. Un `text` sin límite escrito desde un panel es
+ * donde alguien termina pegando un hilo de correo entero, y el que lo ve es
+ * el cajero del bar.
+ *
+ * ⚠️ Los mensajes YA GUARDADOS con más de 140 no se truncan ni se borran. El
+ * límite aplica a lo que se escribe de ahora en más — pero un REINTENTO de
+ * una fila vieja larga vuelve a pasar por acá y va a ser rechazado con un
+ * 400 legible. Es visible y se arregla editando el texto; lo alternativo era
+ * mantener dos límites para siempre.
  */
-export const MENSAJE_MAX = 280
+export const MENSAJE_MAX = 140
 
 /**
  * Normaliza y valida el mensaje.
