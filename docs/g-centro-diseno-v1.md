@@ -145,6 +145,24 @@ tres productos.
 bandera (§5) sin tocar a un cliente que paga. Probar el camino entero contra una
 organización real es lo único que verifica que el puente funciona; simularlo no.
 
+**Hay DOS organizaciones de laboratorio, y no sirven para lo mismo.** Confundirlas se
+descubre a mitad de una prueba, que es el peor momento:
+
+| | UUID | Para qué sirve | Qué NO se puede |
+|---|---|---|---|
+| **LAB** | `f4fa692d-6cf3-43fb-a17f-18b8b163c918` | Efecto **visible**: tiene sede y usuarios, así que alguien puede entrar y VER el banner | — |
+| **LabCentro** | `266d4b37-a630-4782-9cc9-8cb054494211` | Probar **escritura**: que la bandera se aplique y el estado quede guardado | No tiene sede ni usuarios: **nadie puede iniciar sesión, así que el banner no se puede mirar** |
+
+O sea que «se aplicó» y «se ve» siguen siendo dos verificaciones distintas, y sólo LAB
+prueba la segunda — que es la que le importa a un cliente. Es la misma distinción que la
+tabla de §9.8 hace entre «contra la base real» y «por el camino del usuario».
+
+**Sobre el marcador `es_laboratorio` de la configuración de G-Vento: no lo lee ningún
+código de allá, y no hay de dónde excluir una organización — cada consulta suya está
+acotada por RLS a la organización propia.** Es una anotación para humanos, no un filtro.
+**La exclusión real de la cobranza es NUESTRA**, con `es_prueba = true` y las vistas de
+acá abajo. No se asume que del otro lado alguien filtre algo.
+
 `es_prueba` es `not null default false`, y el default no es un detalle: con la columna
 nullable o con default `true`, un cliente nuevo podría **nacer invisible para la
 cobranza** por un olvido en un INSERT. El modo de fallo tiene que ser "aparece aunque no
@@ -1608,6 +1626,28 @@ cuando deja de servir en vez de descubrirlo el día que se necesita.
      nombre —no lo elige de una lista, no se autocompleta— y confirma con los dos datos
      a la vista. Que sea escribir es el punto: obliga a leer el dato en vez de pegarlo,
      que es exactamente donde se produce el error que se quiere atrapar.
+
+     ⚠️ **EL NOMBRE NO ES IDENTIDAD, y la comparación va contra el UUID.** Lo corrigió
+     G-Vento (20/08/2026) y es correcto por dos razones independientes:
+
+     - Su `unique` sobre `organizations.name` es **sensible a mayúsculas y espacios**:
+       «labcentro» y «LabCentro» son dos nombres distintos allá. Si el operador
+       transcribe con otra mayúscula, una comparación exacta daría **falso desacuerdo
+       sobre un UUID correcto** — y una alarma que salta cuando todo está bien enseña a
+       ignorar la alarma.
+     - **El nombre es mutable y el UUID no.** El día que renombren una organización, el
+       par nombre+UUID deja de coincidir sin que nada esté mal. Un chequeo que se rompe
+       solo con el tiempo no es un chequeo.
+
+     Entonces: **lo que identifica es el UUID; el nombre existe para que un humano lo
+     LEA antes de confirmar.** Si el nombre se valida contra algo, se compara
+     normalizado —minúsculas, sin espacios en los extremos— y **nunca exacto**; y un
+     desacuerdo advierte, no bloquea. Lo que no puede pasar es que una diferencia de
+     mayúscula impida una vinculación correcta.
+
+     El mecanismo no pierde nada con eso: su valor nunca estuvo en la comparación
+     automática —que no puede existir, porque no hay a quién preguntarle— sino en que
+     **escribir el nombre obliga a leer el dato en vez de pegarlo**.
 
      Sigue sin haber verificación contra G-Vento, y eso no cambió: el contrato tiene una
      sola llamada y **escribe**. Lo que hay es una segunda lectura humana del mismo dato.
