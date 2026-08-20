@@ -197,3 +197,50 @@ describe('el alta escribe todas las columnas que la base exige', () => {
     expect(escribe.filter((c) => obligatorias.includes(c)).sort()).toEqual(obligatorias.sort())
   })
 })
+
+describe('la regla del aniversario no diverge entre el SQL y el modelo', () => {
+  /**
+   * ⚠️ ESTA REGLA ESTÁ ESCRITA DOS VECES a propósito: en
+   * `transicionImplementacion` y en `exonerar_implementacion` (`017`). La
+   * guarda no puede vivir sólo en el navegador, donde cualquiera puede llamar
+   * a la RPC sin pasar por la pantalla.
+   *
+   * Duplicar una regla de plata es aceptable SÓLO si algo verifica que las
+   * dos copias dicen lo mismo. Eso es este test: lee la migración y la
+   * compara con el modelo. Sin él, la duplicación es una bomba de tiempo.
+   */
+  const sql017 = () => sql('017_vinculo_e_implementacion')
+
+  it('el SQL exonera desde el mismo estado que el modelo, y hacia el mismo', () => {
+    const desde = sql017().match(
+      /estado_implementacion <> '([a-z_]+)'\s*then\s*\n\s*raise exception 'la implementacion esta en/,
+    )
+    const hacia = sql017().match(/set estado_implementacion = '([a-z_]+)'/)
+    expect(desde, 'no se encontró la guarda de origen en la 017').not.toBeNull()
+    expect(hacia, 'no se encontró el destino en la 017').not.toBeNull()
+
+    const origen = desde![1] as (typeof ESTADOS_IMPLEMENTACION)[number]
+    expect(ESTADOS_IMPLEMENTACION).toContain(origen)
+    expect(transicionImplementacion(origen, { tipo: 'ANIVERSARIO_ANUAL' })).toBe(hacia![1])
+  })
+
+  it('el SQL no se olvida de ningún estado que el modelo movería', () => {
+    // El SQL tiene UNA guarda de origen. Si el modelo moviera dos estados
+    // ante el aniversario, esa guarda dejaría uno afuera en silencio.
+    const mueve = ESTADOS_IMPLEMENTACION.filter(
+      (e) => transicionImplementacion(e, { tipo: 'ANIVERSARIO_ANUAL' }) !== e,
+    )
+    expect(mueve).toEqual(['exonerada_condicional'])
+  })
+
+  it('los doce meses son los mismos de los dos lados', () => {
+    const meses = sql017().match(/interval '(\d+) months'\)\s*then/)
+    expect(meses, 'no se encontró el umbral en la 017').not.toBeNull()
+    const n = Number(meses![1])
+    // El mismo número que decide `exonerada_condicional` al firmar: si uno se
+    // moviera sin el otro, habría contratos que nacen condicionales y nunca
+    // llegan a exonerarse, o al revés.
+    expect(implementacionAlFirmar(n)).toBe('exonerada_condicional')
+    expect(implementacionAlFirmar(n - 1)).toBe('pendiente')
+  })
+})
