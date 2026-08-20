@@ -1014,6 +1014,25 @@ que dejar personalizar sobre la plantilla en vez de obligar a elegir entre plant
 texto propio. El caso que hay que soportar es "la de siempre, más una frase para este
 cliente" — que es como se escribe una cobranza de verdad.
 
+#### El único texto que sale hacia afuera estuvo sin un solo test
+
+Lo que importa de lo que pasó el 19/08/2026 no es que dos plantillas quedaran largas al
+bajar el límite. Es que **el contenido del único canal de G-Centro hacia una persona que
+no trabaja en Giiron no tenía ninguna prueba, de ningún tipo, desde que se escribió.**
+
+Con 567 tests en el repo, lo cubierto era el mecanismo —que el mensaje viaja, que se firma,
+que se guarda, que se reenvía en un reintento (`014`)— y lo no cubierto era **qué dice**.
+La asimetría no es casual: el mecanismo falla ruidosamente y el contenido no falla nunca,
+sólo queda mal, y «queda mal» no tiene stack trace. Un banner que promete un bloqueo que
+no ocurre, o que acusa al cajero, funciona perfecto según cualquier test de transporte.
+
+Vale para lo que venga: **cada vez que se agregue algo que un cliente lee, la pregunta no
+es si viaja, es si dice lo que tiene que decir.** Hoy `plantillas.test.ts` fija tres
+propiedades —que cada plantilla es enviable tal como se ofrece, que `activa` no propone
+texto, y que los dos niveles que cobran siguen nombrando qué NO se bloquea—, y esa última
+es la que protege la regla de redacción que más caro sale romper: amenazar con algo que no
+pasa se descubre en el peor momento posible.
+
 #### Las plantillas viven en el código, y por qué
 
 En `src/lib/plantillas.ts`, como `Record<Nivel, Plantilla>`.
