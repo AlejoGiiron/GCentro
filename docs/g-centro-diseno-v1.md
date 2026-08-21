@@ -1481,8 +1481,13 @@ dio verde sobre algo falso.
 ### 9.9 El modelo de cobro está completo y no tiene consumidor
 
 `calcularCambioDePlan`, `transicionImplementacion`, `implementacionAlFirmar`,
-`tarifaDiaria`, `diasDelPeriodo` y `diasRestantes` están escritos y probados —46 tests— y
-**ninguno se ejecuta desde el panel.**
+`tarifaDiaria`, `diasDelPeriodo` y `diasRestantes` están escritos y probados —46 tests—.
+
+**Actualizado el 20/08/2026:** `implementacionAlFirmar` y `mensualEfectivo` ya corren
+—los usa el alta—. `calcularCambioDePlan`, `tarifaDiaria`, `diasDelPeriodo` y
+`diasRestantes` siguen sin ejecutarse desde ninguna parte, y `transicionImplementacion`
+tampoco: su regla se ejecuta, pero desde el SQL (ver abajo). Lo que sigue en pie es el
+diagnóstico.
 
 **La causa es una sola, y explica los dos huecos a la vez: el panel no puede crear ni
 modificar una suscripción.** Cero `insert` y cero `update` sobre `suscripciones` fuera de
@@ -1510,12 +1515,24 @@ el año»: el día de la firma. Ese contrato nace `exonerada_condicional`, y doc
 después nadie lo pasa a `exonerada` — la implementación queda condicionalmente perdonada
 para siempre y sigue siendo reclamable.
 
-**Y no se construye el consumidor antes de que el caso exista.** Se propuso adelantar la
-pieza que falta —una categoría de atención «cumplió doce meses, falta exonerar» con su
-botón— junto con el alta. Se descartó, y el argumento es el mismo que este documento usa
-para no darle pantalla al cambio de plan: construir la mitad de atrás de un flujo cuya
-mitad de adelante no existe deja código que nadie pudo verificar contra un caso real. El
-día que se firme un anual hay contra qué verificarlo.
+**Y no se construyó el consumidor antes de que el caso existiera.** Se propuso adelantar
+la pieza —una categoría de atención «cumplió doce meses, falta exonerar» con su botón—
+junto con el alta, y se descartó: construir la mitad de atrás de un flujo cuya mitad de
+adelante no existe deja código que nadie pudo verificar contra un caso real.
+
+**El 20/08/2026 el caso apareció.** Se firmaron contratos desde el panel, uno anual, y
+nació `exonerada_condicional`: un contrato real que nadie iba a mover nunca. Ahí sí se
+construyó la categoría, el botón y la `017`.
+
+⚠️ **Pero el consumidor que apareció es SQL, no el modelo.** El botón llama a
+`exonerar_implementacion()`, que implementa la regla en PL/pgSQL —la guarda no puede vivir
+sólo en el navegador, donde cualquiera puede llamar a la RPC sin pasar por la pantalla—.
+O sea que la regla del aniversario **está escrita dos veces**, y `transicionImplementacion`
+sigue sin tener un solo llamador en TypeScript.
+
+Eso no se tapa: se verifica. `cobro.esquema.test.ts` lee la `017` y compara origen, destino
+y umbral contra el modelo. Duplicar una regla de plata es aceptable sólo si algo prueba que
+las dos copias dicen lo mismo; sin eso, la duplicación es una bomba de tiempo.
 
 #### Mientras tanto: código en espera, con guarda
 
