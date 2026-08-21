@@ -20,11 +20,12 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 import { useState } from 'react'
-import { fecha, pesos } from '@/lib/formato'
+import { addMonths, format, parseISO } from 'date-fns'
+import { fecha, hoyISO, pesos } from '@/lib/formato'
 import { BOTON, CAMPO, ETIQUETA, SECCION, TITULO_SECCION } from '@/lib/formulario'
 import { FOCO, SENAL, TINTA } from '@/lib/tokens'
 import { esUuid, nombresDifieren } from '@/lib/organizacion'
-import type { FilaLista } from '@/features/clientes/vista'
+import { implementacionPorExonerar, type FilaLista } from '@/features/clientes/vista'
 import { useCorregirVinculo, useExonerar, useVincular } from './useDetalle'
 
 export function VincularOrganizacion({ fila }: { fila: FilaLista }) {
@@ -249,7 +250,23 @@ export function Implementacion({ fila }: { fila: FilaLista }) {
 
   if (s.estado_implementacion !== 'exonerada_condicional') return null
 
-  const listo = fila.atencion === 'IMPLEMENTACION_POR_EXONERAR'
+  /**
+   * ⚠️ SE PREGUNTA POR EL ANIVERSARIO, NO POR `fila.atencion`.
+   *
+   * Estaba escrito como `atencion === 'IMPLEMENTACION_POR_EXONERAR'`, y eso
+   * eran dos defectos en una línea:
+   *
+   * · `atencion` es la PRIORIDAD EN LA LISTA, una sola por fila y la peor que
+   *   haya. Un contrato que cumplió el año y además está sin puente o sin
+   *   pagos nunca habría mostrado el botón — la exoneración no depende de
+   *   ninguna de esas cosas.
+   * · Y el texto de abajo afirmaba «todavía no cumplió el año» sin haberlo
+   *   mirado: para una fila con otra atención encima, era falso. Afirmar un
+   *   motivo que no se verificó es la misma familia que mostrar un 0% donde
+   *   no hay lista contra qué comparar.
+   */
+  const listo = implementacionPorExonerar(s.estado_implementacion, s.fecha_inicio, hoyISO())
+  const aniversario = format(addMonths(parseISO(s.fecha_inicio), 12), 'yyyy-MM-dd')
 
   return (
     <section className={SECCION}>
@@ -279,7 +296,8 @@ export function Implementacion({ fila }: { fila: FilaLista }) {
         </>
       ) : (
         <p className={`text-micro ${TINTA.debil}`}>
-          Todavía no cumplió el año: no hay nada que hacer acá.
+          Cumple los doce meses el {fecha(aniversario)}. Hasta entonces no hay nada que
+          hacer acá.
         </p>
       )}
     </section>

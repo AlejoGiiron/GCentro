@@ -39,6 +39,7 @@ function filaCon(o: {
   organizacion?: string | null
   nombre?: string | null
   implementacion?: string
+  inicio?: string
   atencion?: Atencion
 }): FilaLista {
   return {
@@ -51,7 +52,7 @@ function filaCon(o: {
       descuento_pct: 30,
       estado_implementacion: o.implementacion ?? 'cobrada',
       monto_implementacion: 250000,
-      fecha_inicio: '2025-08-01',
+      fecha_inicio: o.inicio ?? '2025-08-01',
       organizacion_externa_nombre: o.nombre ?? null,
       periodo_actual_inicio: '2025-08-01',
       periodo_actual_fin: '2026-07-31',
@@ -117,21 +118,40 @@ describe('la implementación del aniversario', () => {
     }
   })
 
-  it('condicional y sin cumplir el año: lo dice y NO ofrece el botón', () => {
+  it('sin cumplir el año: NO ofrece el botón, y dice CUÁNDO lo cumple', () => {
+    // Decir la fecha en vez de «todavía no» convierte un no en una respuesta:
+    // el operador sabe si volver mañana o el año que viene.
     const html = montar(
-      <Implementacion fila={filaCon({ implementacion: 'exonerada_condicional' })} />,
+      <Implementacion
+        fila={filaCon({ implementacion: 'exonerada_condicional', inicio: '2026-08-01' })}
+      />,
     )
     expect(html).toContain('Perdonada condicionalmente')
-    expect(html).toContain('Todavía no cumplió el año')
+    expect(html).toContain('Cumple los doce meses el')
+    expect(html).toContain('2027')
     expect(html).not.toContain('Exonerar')
   })
 
   it('con el año cumplido: aparece el botón', () => {
     const html = montar(
       <Implementacion
+        fila={filaCon({ implementacion: 'exonerada_condicional', inicio: '2025-08-01' })}
+      />,
+    )
+    expect(html).toContain('Exonerar: cumplió el año')
+  })
+
+  it('el botón NO depende de la atención de la lista', () => {
+    // `atencion` es la prioridad en la lista: una sola por fila, la peor que
+    // haya. Un contrato que cumplió el año y además está sin puente o sin
+    // pagos tiene que poder exonerarse igual — la exoneración no depende de
+    // ninguna de esas dos cosas.
+    const html = montar(
+      <Implementacion
         fila={filaCon({
           implementacion: 'exonerada_condicional',
-          atencion: 'IMPLEMENTACION_POR_EXONERAR',
+          inicio: '2025-08-01',
+          atencion: 'SIN_HISTORIAL',
         })}
       />,
     )
