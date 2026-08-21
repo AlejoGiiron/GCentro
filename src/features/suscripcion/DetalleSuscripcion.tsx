@@ -25,6 +25,8 @@ import type { FilaLista } from '@/features/clientes/vista'
 import { CONCEPTOS, METODOS, formularioPagoSchema, type Evento, type Pago } from './schemas'
 import { textoDe } from '@/lib/puente-texto'
 import { MENSAJE_MAX } from '@/lib/bandera'
+import { BOTON, CAMPO, ETIQUETA, SECCION, TITULO_SECCION } from '@/lib/formulario'
+import { Implementacion, VincularOrganizacion } from './VincularOrganizacion'
 import {
   useCambiarEstado,
   useConfirmarBandera,
@@ -32,13 +34,6 @@ import {
   useRegistrarPago,
 } from './useDetalle'
 
-const CAMPO =
-  'w-full rounded border border-lienzo-divisor bg-lienzo-panel px-2 py-1 text-dato ' +
-  `text-tinta-fuerte placeholder:text-tinta-debil ${FOCO}`
-const ETIQUETA = 'block text-micro font-medium text-tinta-media mb-1'
-const BOTON = `rounded px-3 py-1.5 text-dato font-medium ${FOCO} disabled:opacity-50 disabled:cursor-not-allowed`
-const SECCION = 'rounded border border-lienzo-borde bg-lienzo-panel p-4'
-const TITULO_SECCION = 'mb-3 text-micro font-semibold uppercase tracking-grupo text-tinta-media'
 
 // ── Autor ─────────────────────────────────────────────────────────────────
 
@@ -443,6 +438,8 @@ export function DetalleSuscripcion({ fila, volver }: { fila: FilaLista; volver: 
       <div className="grid gap-4 xl:grid-cols-2">
         <CambiarEstado fila={fila} />
         <ConfirmarBandera fila={fila} />
+        <VincularOrganizacion fila={fila} />
+        <Implementacion fila={fila} />
         <RegistrarPago fila={fila} />
         <Historial suscripcionId={s.id} />
       </div>

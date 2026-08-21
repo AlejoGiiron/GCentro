@@ -27,10 +27,15 @@ export const suscripcionListaSchema = z.object({
   // hay algo pendiente y `fecha_inicio` dice desde cuándo se cuentan los doce
   // meses. Se cuenta desde el inicio del SERVICIO, no desde `creado_en`.
   estado_implementacion: z.string(),
+  monto_implementacion: z.number().int(),
   fecha_inicio: z.string(),
   periodo_actual_inicio: z.string(),
   periodo_actual_fin: z.string(),
   organizacion_externa_id: z.string().uuid().nullable(),
+  // CACHE del nombre que leyó quien vinculó (`017`). La fuente es el evento
+  // ORGANIZACION_VINCULADA; esto es su última foto, para que el detalle no
+  // tenga que recorrer el historial.
+  organizacion_externa_nombre: z.string().nullable(),
   clientes: z.object({
     id: z.string().uuid(),
     nombre_comercial: z.string(),

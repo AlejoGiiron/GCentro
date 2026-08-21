@@ -161,3 +161,76 @@ export function useConfirmarBandera(suscripcionId: string) {
     onSuccess: invalidar,
   })
 }
+
+/**
+ * Vincular la organización de G-Vento, y corregir un vínculo ya hecho.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SON DOS OPERACIONES DISTINTAS A PROPÓSITO, y la base lo obliga (`017`).
+ *
+ * Vincular desde vacío no pisa nada. Corregir apunta un contrato a OTRA
+ * organización: la próxima bandera le pone —o le saca— el banner de cobranza
+ * a quien no era, en vivo. Por eso exige motivo, queda auditado, y el trigger
+ * bloquea el update directo aunque alguien intente saltearse la pantalla.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+export function useVincular(suscripcionId: string) {
+  const invalidar = useInvalidar(suscripcionId)
+  return useMutation({
+    meta: { area: 'clientes' },
+    mutationKey: ['vincular-organizacion'],
+    mutationFn: async (v: { organizacion: string; nombre: string }) => {
+      const { error } = await supabase.rpc('vincular_organizacion', {
+        p_suscripcion_id: suscripcionId,
+        p_organizacion: v.organizacion.trim(),
+        // Se manda lo que el operador ESCRIBIÓ, sin normalizar: es el registro
+        // de qué leyó. La normalización es sólo para comparar.
+        p_nombre: v.nombre.trim(),
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useCorregirVinculo(suscripcionId: string) {
+  const invalidar = useInvalidar(suscripcionId)
+  return useMutation({
+    meta: { area: 'clientes' },
+    mutationKey: ['corregir-vinculo'],
+    mutationFn: async (v: { organizacion: string; nombre: string; motivo: string }) => {
+      const { error } = await supabase.rpc('corregir_organizacion_externa', {
+        p_suscripcion_id: suscripcionId,
+        p_organizacion: v.organizacion.trim(),
+        p_nombre: v.nombre.trim(),
+        p_motivo: v.motivo.trim(),
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+/**
+ * Exonerar la implementación al cumplirse el aniversario (§9.9).
+ *
+ * El botón sólo aparece cuando la fila está en `IMPLEMENTACION_POR_EXONERAR`,
+ * pero la guarda de verdad está en la RPC: valida el estado de origen y los
+ * doce meses. Una pantalla no puede ser la única guarda de algo que cambia
+ * plata — cualquiera puede llamar a la función sin pasar por acá.
+ */
+export function useExonerar(suscripcionId: string) {
+  const invalidar = useInvalidar(suscripcionId)
+  return useMutation({
+    meta: { area: 'clientes' },
+    mutationKey: ['exonerar-implementacion'],
+    mutationFn: async (v: { motivo?: string }) => {
+      const { error } = await supabase.rpc('exonerar_implementacion', {
+        p_suscripcion_id: suscripcionId,
+        p_motivo: v.motivo?.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}

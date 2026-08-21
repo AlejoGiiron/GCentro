@@ -48,7 +48,8 @@ import { clasificar, type EstadoBandera, type FilaLista } from './vista'
 
 const SELECT = `
   id, estado, sedes_adicionales, precio_base_mensual, precio_sede_adicional,
-  descuento_pct, estado_implementacion, fecha_inicio,
+  descuento_pct, estado_implementacion, monto_implementacion, fecha_inicio,
+  organizacion_externa_nombre,
   periodo_actual_inicio, periodo_actual_fin,
   organizacion_externa_id,
   clientes!inner ( id, nombre_comercial, es_prueba ),

@@ -368,6 +368,7 @@ export type Database = {
           id: string
           monto_implementacion: number
           organizacion_externa_id: string | null
+          organizacion_externa_nombre: string | null
           periodo_actual_fin: string
           periodo_actual_inicio: string
           plan_id: string
@@ -387,6 +388,7 @@ export type Database = {
           id?: string
           monto_implementacion: number
           organizacion_externa_id?: string | null
+          organizacion_externa_nombre?: string | null
           periodo_actual_fin: string
           periodo_actual_inicio: string
           plan_id: string
@@ -406,6 +408,7 @@ export type Database = {
           id?: string
           monto_implementacion?: number
           organizacion_externa_id?: string | null
+          organizacion_externa_nombre?: string | null
           periodo_actual_fin?: string
           periodo_actual_inicio?: string
           plan_id?: string
@@ -638,6 +641,7 @@ export type Database = {
       corregir_organizacion_externa: {
         Args: {
           p_motivo: string
+          p_nombre: string
           p_organizacion: string
           p_suscripcion_id: string
         }
@@ -663,6 +667,18 @@ export type Database = {
         Returns: string
       }
       es_admin: { Args: never; Returns: boolean }
+      exonerar_implementacion: {
+        Args: { p_motivo?: string; p_suscripcion_id: string }
+        Returns: undefined
+      }
+      vincular_organizacion: {
+        Args: {
+          p_nombre: string
+          p_organizacion: string
+          p_suscripcion_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -74,6 +74,8 @@ function fila(o: {
       precio_sede_adicional: 60000,
       descuento_pct: 0,
       estado_implementacion: 'cobrada',
+      monto_implementacion: 250000,
+      organizacion_externa_nombre: null,
       fecha_inicio: '2026-01-01',
       periodo_actual_inicio: '2026-08-01',
       periodo_actual_fin: '2026-08-31',
