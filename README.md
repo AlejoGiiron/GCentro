@@ -55,6 +55,16 @@ prefijo** justamente para que no viajen al navegador.
 Vercel, desde el repo. `vercel.json` ya lleva el comando de build, la salida y las
 cabeceras.
 
+⚠️ **La Production Branch de Vercel es `develop`, y este repo NO TIENE `main`.**
+
+O sea que **`git push origin develop` despliega a producción**. No hay preview intermedio
+ni un paso de promoción: lo que se pushea, sale. Está anotado acá porque lo natural es
+suponer lo contrario —que `develop` es integración y que producción vive en otra rama— y
+esa suposición hace que alguien pushee "para ver el preview".
+
+Si algún día hace falta un escalón, se crea `main` y se mueve la Production Branch; hasta
+entonces, el escalón es el push.
+
 **No lleva `rewrites`, y eso es deliberado:** el panel usa `HashRouter`, así que la ruta
 que llega al servidor es siempre `/` — el `#` no viaja en la petición. Es la razón por la
 que se eligió: un enlace compartido y un F5 no pueden fallar por configuración de hosting.

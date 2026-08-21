@@ -176,7 +176,8 @@ filtro no sabe de dónde viene una clave.
   `proximo_cobro`). No mezclarlos: un cobro es un día del calendario
   colombiano, no un instante, y tratarlo como timestamp corre los bordes de mes.
 - **UUID v4** para todos los identificadores.
-- Rama **`develop`**. Nunca commit directo a `main`.
+- Rama **`develop`**, y **`main` no existe en este repo**: `develop` es la Production
+  Branch de Vercel, así que **pushear es desplegar**. No hay preview ni promoción.
 - **Conventional Commits**, commits atómicos.
 - **`git add` con rutas explícitas. Nunca `git add -A` ni `git add .`.**
   Un `-A` barre lo que esté sin trackear y sin ignorar, que es un estado en el
