@@ -27,6 +27,7 @@ import { textoDe } from '@/lib/puente-texto'
 import { MENSAJE_MAX } from '@/lib/bandera'
 import { BOTON, CAMPO, ETIQUETA, SECCION, TITULO_SECCION } from '@/lib/formulario'
 import { Implementacion, VincularOrganizacion } from './VincularOrganizacion'
+import { detalleDeEvento } from './evento-texto'
 import {
   useCambiarEstado,
   useConfirmarBandera,
@@ -400,6 +401,17 @@ function Historial({ suscripcionId }: { suscripcionId: string }) {
                   <span className="text-tinta-media">{instante(e.creado_en)} · </span>
                   <Autor email={e.admins?.email} />
                 </div>
+                {/* Lo que el evento guardó en `datos`. Sin esto, cinco
+                    vinculaciones seguidas se ven idénticas y lo que la `017`
+                    guarda para el día malo sólo se lee por SQL. */}
+                {detalleDeEvento(e.tipo, e.datos).map((r, i) => (
+                  <div
+                    key={i}
+                    className={`text-micro text-tinta-media ${r.mono ? 'break-all font-mono' : ''}`}
+                  >
+                    {r.texto}
+                  </div>
+                ))}
                 {e.motivo && <div className="text-micro text-tinta-media">«{e.motivo}»</div>}
               </li>
             ))}
