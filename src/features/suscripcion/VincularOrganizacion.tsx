@@ -36,12 +36,42 @@ export function VincularOrganizacion({ fila }: { fila: FilaLista }) {
   const [motivo, setMotivo] = useState('')
   const [corrigiendo, setCorrigiendo] = useState(false)
 
+  /**
+   * ⚠️ CERRAR Y LIMPIAR AL TERMINAR, y decir que terminó.
+   *
+   * Sin esto la corrección se guardaba y el formulario quedaba abierto con los
+   * mismos valores adentro: se leía como que no había pasado nada, y el
+   * operador lo apretaba de nuevo. La invalidación de la consulta es
+   * asíncrona, así que entre el éxito y el refresco la sección mostraría
+   * todavía el vínculo VIEJO — por eso hace falta el aviso además del cierre.
+   */
+  const listo = () => {
+    setCorrigiendo(false)
+    setUuid('')
+    setNombre('')
+    setMotivo('')
+  }
+
   const yaVinculada = s.organizacion_externa_id !== null
   const formaOk = esUuid(uuid)
   const nombreOk = nombre.trim() !== ''
   const mismoUuid = yaVinculada && uuid.trim() === s.organizacion_externa_id
   const otraOrganizacion = nombresDifieren(s.organizacion_externa_nombre, nombre)
   const falla = vincular.error ?? corregir.error
+
+  /**
+   * ⚠️ QUÉ FALTA, DICHO EN VOZ ALTA. Un botón deshabilitado sin explicación no
+   * comunica que falta algo: comunica que la pantalla está rota. Se apretó
+   * varias veces «Corregir el vínculo» sin motivo escrito y la lectura fue
+   * «el botón no hace nada» — que es exactamente lo que parecía.
+   */
+  const falta = !formaOk
+    ? 'Falta el UUID de la organización.'
+    : !nombreOk
+      ? 'Falta el nombre, escrito a mano.'
+      : corrigiendo && motivo.trim() === ''
+        ? 'Falta el motivo: corregir un vínculo queda en el historial.'
+        : null
 
   return (
     <section className={SECCION}>
@@ -76,6 +106,12 @@ export function VincularOrganizacion({ fila }: { fila: FilaLista }) {
         <p className="mb-3 text-micro text-tinta-media">
           Sin vincular: no se le puede mandar bandera. El nombre y el UUID salen juntos del
           onboarding de G-Vento — <strong>escribí el nombre</strong>, no lo pegues.
+        </p>
+      )}
+
+      {(vincular.isSuccess || corregir.isSuccess) && !corrigiendo && (
+        <p className={`mb-3 text-micro ${SENAL.ok}`} aria-live="polite">
+          Vínculo guardado. Quedó en el historial, abajo.
         </p>
       )}
 
@@ -160,11 +196,14 @@ export function VincularOrganizacion({ fila }: { fila: FilaLista }) {
               }
               onClick={() =>
                 corrigiendo
-                  ? corregir.mutate({ organizacion: uuid, nombre, motivo })
-                  : vincular.mutate({ organizacion: uuid, nombre })
+                  ? corregir.mutate({ organizacion: uuid, nombre, motivo }, { onSuccess: listo })
+                  : vincular.mutate({ organizacion: uuid, nombre }, { onSuccess: listo })
               }
             >
-              {corrigiendo ? 'Corregir el vínculo' : 'Vincular'}
+              {/* ⚠️ NO dice «Corregir el vínculo»: así se llama el botón que
+                  ABRE este formulario, y dos botones con la misma etiqueta en
+                  la misma pantalla hacen imposible reportar cuál falló. */}
+              {corrigiendo ? 'Guardar la corrección' : 'Vincular'}
             </button>
 
             {corrigiendo && (
@@ -174,6 +213,10 @@ export function VincularOrganizacion({ fila }: { fila: FilaLista }) {
               >
                 Cancelar
               </button>
+            )}
+
+            {falta !== null && (
+              <span className={`text-micro ${TINTA.debil}`}>{falta}</span>
             )}
 
             {falla !== null && (
